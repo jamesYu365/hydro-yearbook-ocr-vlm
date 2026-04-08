@@ -88,6 +88,25 @@ python -c "import GOT; print('got ok')"
 pytest -q
 ```
 
+## Chinese Fonts
+
+Synthetic rendering requires a font that can display Chinese headers such as `流量表` and `日期`.
+
+Recommended Linux font paths on this machine class include:
+
+```bash
+/usr/share/fonts/MyFonts/simsun.ttc
+/usr/share/fonts/MyFonts/MSYH.TTC
+/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc
+/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf
+```
+
+You can inspect available Chinese fonts with:
+
+```bash
+fc-list :lang=zh family file
+```
+
 ## Project Smoke Test
 
 ```bash
@@ -108,4 +127,5 @@ bash ./scripts/models/got_ocr2/run_swift_sft.sh
 - Install everything inside the `got` environment.
 - Keep reference code under `references/`.
 - Keep project adapters and automation in this repository.
+- Ensure the synthetic renderer is using a Chinese-capable font before generating the final dataset.
 - Real test image extraction from the source PDF is still a separate step.

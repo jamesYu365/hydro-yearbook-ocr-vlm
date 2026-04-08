@@ -12,6 +12,7 @@ The synthetic dataset is the primary training source for v0.
 - Do not reuse real table screenshots.
 - Match table skeleton first: row heights, column widths, borders, header structure, alignment.
 - Match font system next: font family, size, weight, and numeric appearance.
+- Use a Chinese-capable font for all rendered text. Do not use Latin-only defaults such as DejaVu Sans for the final dataset.
 - Match line width, margins, and whitespace after that.
 - Add print and scan texture last.
 
@@ -57,4 +58,5 @@ The current v0 generator:
 - reuses the fixed table structure
 - builds month-wise numeric pools from real labels
 - samples new numeric values independently
+- auto-selects a system Chinese font when `--font-path` is not provided
 - writes image, layout JSON, and manifest outputs together

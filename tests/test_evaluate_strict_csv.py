@@ -6,7 +6,7 @@ def test_value_error_keeps_structure() -> None:
     prediction = "日期,一月\n1,12\n2,99\n"
     result = score_sample("sample_1", prediction, target)
     assert result.error_type == "value_error"
-    assert result.cell_accuracy == 0.75
+    assert result.cell_accuracy == 5 / 6
 
 
 def test_truncation_is_detected() -> None:

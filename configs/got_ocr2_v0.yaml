@@ -30,7 +30,7 @@ data:
   layout_format: json
 
 render:
-  font_path: /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+  font_path: /usr/share/fonts/MyFonts/simsun.ttc
   image_width: 1800
   image_height: 2200
   cell_padding: 10

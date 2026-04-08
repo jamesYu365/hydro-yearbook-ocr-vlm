@@ -24,6 +24,32 @@ from scripts.common.yearbook_flow_common import (
     seeded_random,
 )
 
+DEFAULT_FONT_CANDIDATES = (
+    Path("/usr/share/fonts/MyFonts/simsun.ttc"),
+    Path("/usr/share/fonts/MyFonts/MSYH.TTC"),
+    Path("/usr/share/fonts/MyFonts/MSYHBD.TTC"),
+    Path("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
+    Path("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
+    Path("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf"),
+    Path("/usr/share/fonts/truetype/arphic/uming.ttc"),
+    Path("/usr/share/fonts/truetype/arphic/ukai.ttc"),
+)
+
+
+def resolve_font_path(font_path: Path | None) -> Path:
+    if font_path is not None:
+        if not font_path.exists():
+            raise FileNotFoundError(f"Font file not found: {font_path}")
+        return font_path
+    for candidate in DEFAULT_FONT_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    formatted = "\n".join(f"- {path}" for path in DEFAULT_FONT_CANDIDATES)
+    raise FileNotFoundError(
+        "No usable Chinese font was found. Pass --font-path explicitly or install one of:\n"
+        f"{formatted}"
+    )
+
 
 def discover_template_rows(dataset_dir: Path) -> list[list[str]]:
     first_csv = sorted(dataset_dir.glob("*.csv"))[0]
@@ -200,11 +226,13 @@ def main() -> None:
     parser.add_argument(
         "--font-path",
         type=Path,
-        default=Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        default=None,
+        help="Optional path to a Chinese-capable font. If omitted, the script auto-selects a system font.",
     )
     args = parser.parse_args()
 
     rng = seeded_random(args.seed)
+    font_path = resolve_font_path(args.font_path)
     template_rows = discover_template_rows(args.dataset_dir)
     pools = build_numeric_pools(args.dataset_dir)
 
@@ -221,7 +249,7 @@ def main() -> None:
     for index in range(args.num_samples):
         sample_rows = sample_table_rows(template_rows, pools, rng)
         sample_csv = csv_rows_to_text(sample_rows)
-        image, cells = render_table(sample_rows, args.font_path, rng)
+        image, cells = render_table(sample_rows, font_path, rng)
         image, perturbations = apply_perturbations(image, rng)
 
         sample_name = f"flow_v0_{index:05d}"
@@ -262,7 +290,7 @@ def main() -> None:
 
     print(
         f"Generated {args.num_samples} synthetic samples under {args.output_dir} "
-        f"and manifests under {manifest_dir}"
+        f"and manifests under {manifest_dir} using font {font_path}"
     )
 
 
