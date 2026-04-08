@@ -122,6 +122,13 @@ Then run:
 bash ./scripts/models/got_ocr2/run_swift_sft.sh
 ```
 
+If you want the downloaded base model and runtime caches to stay inside the repository instead of under your home directory, keep using the wrapper above.
+It writes caches under:
+
+```bash
+outputs/cache/
+```
+
 ## Notes
 
 - Install everything inside the `got` environment.
