@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_NAME="${ENV_NAME:-rapid}"
+ENV_NAME="${ENV_NAME:-got}"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 GOT_REF_DIR="${GOT_REF_DIR:-$PROJECT_ROOT/references/GOT-OCR2.0-main/GOT-OCR-2.0-master}"
 

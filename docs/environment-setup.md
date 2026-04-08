@@ -2,7 +2,7 @@
 
 ## Goal
 
-Prepare a Linux `rapid` conda environment that can run:
+Prepare a Linux `got` conda environment that can run:
 - synthetic data generation
 - GOT-OCR2.0 data conversion
 - `ms-swift` LoRA fine-tuning
@@ -37,8 +37,8 @@ conda --version
 If the environment already exists, reuse it. Otherwise:
 
 ```bash
-conda create -n rapid python=3.10 -y
-conda activate rapid
+conda create -n got python=3.10 -y
+conda activate got
 ```
 
 ## Python Dependencies
@@ -105,7 +105,7 @@ bash ./scripts/models/got_ocr2/run_swift_sft.sh
 
 ## Notes
 
-- Install everything inside the `rapid` environment.
+- Install everything inside the `got` environment.
 - Keep reference code under `references/`.
 - Keep project adapters and automation in this repository.
 - Real test image extraction from the source PDF is still a separate step.

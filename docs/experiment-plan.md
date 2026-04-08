@@ -38,7 +38,7 @@ Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evalu
 
 ## Current Execution Order
 
-1. validate the Linux `rapid` environment
+1. validate the Linux `got` environment
 2. run a small synthetic smoke test
 3. build train and validation `ms-swift` manifests
 4. extract real station-level table images from the PDF

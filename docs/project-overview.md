@@ -42,7 +42,7 @@ The current v0 direction is intentionally narrow:
 ## Current Gaps
 
 The main remaining execution gaps are:
-- validate the Linux training stack inside the `rapid` conda environment
+- validate the Linux training stack inside the `got` conda environment
 - extract real PDF pages into station-level single-table images
 - launch the first `GOT-OCR2.0` LoRA fine-tuning run
 

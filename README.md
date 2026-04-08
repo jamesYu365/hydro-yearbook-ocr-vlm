@@ -43,7 +43,7 @@ Repository status as of the current Linux migration:
 - small sample outputs and manifest previews already exist under `data/`
 
 Still missing:
-- full Linux training environment validation in the `rapid` conda environment
+- full Linux training environment validation in the `got` conda environment
 - real PDF to single-table image extraction for the final test set
 - the first end-to-end `GOT-OCR2.0` LoRA fine-tuning run
 
@@ -76,7 +76,7 @@ Data notes:
 
 ## Quick Start
 
-Use the Linux `rapid` conda environment for this project.
+Use the Linux `got` conda environment for this project.
 
 1. Read [docs/project-overview.md](docs/project-overview.md)
 2. Review the v0 data contract in [docs/data-spec.md](docs/data-spec.md)
@@ -98,7 +98,7 @@ These scripts are implemented, but they require a suitable Python 3.10+ environm
 ## Roadmap
 
 Near-term execution order:
-- validate the Linux `rapid` environment and run a smoke test
+- validate the Linux `got` environment and run a smoke test
 - extract real PDF pages into single-table station images
 - launch the first `GOT-OCR2.0` LoRA fine-tuning run
 - evaluate on the real flow test set with strict raw-output scoring

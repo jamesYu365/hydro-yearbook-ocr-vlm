@@ -43,7 +43,7 @@ v0 任务固定为：
 - `data/` 下已有小规模样本与 manifest 预览产物
 
 当前仍未完成：
-- 在 `rapid` conda 环境中真正装通并验证 Linux 训练环境
+- 在 `got` conda 环境中真正装通并验证 Linux 训练环境
 - 将真实 PDF 裁成站点级单表图像
 - 启动第一轮 `GOT-OCR2.0` LoRA 微调
 
@@ -76,7 +76,7 @@ v0 任务固定为：
 
 ## 快速开始
 
-本项目当前使用 Linux 下的 `rapid` conda 环境。
+本项目当前使用 Linux 下的 `got` conda 环境。
 
 1. 阅读 [docs/project-overview.md](docs/project-overview.md)
 2. 阅读 [docs/data-spec.md](docs/data-spec.md) 了解 v0 数据契约
@@ -98,7 +98,7 @@ python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/
 ## 路线图
 
 近期执行顺序：
-- 在 Linux `rapid` 环境中完成 smoke test
+- 在 Linux `got` 环境中完成 smoke test
 - 完成真实 PDF 到站点级单表图像的提取
 - 启动第一轮 `GOT-OCR2.0` LoRA 微调
 - 在真实流量测试集上完成严格评测

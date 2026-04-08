@@ -16,7 +16,7 @@ Reference code:
 
 ## Environment
 
-- use the Linux `rapid` conda environment
+- use the Linux `got` conda environment
 - keep GOT reference code under `references/`
 - keep this repository's adapters under `scripts/models/got_ocr2/`
 
@@ -90,4 +90,4 @@ python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/
 
 - The current repository already includes the data-prep and training adapter scripts.
 - Real test image extraction from the source PDF is still a separate task.
-- If `ms-swift` is not available in `rapid`, install it there rather than in another environment.
+- If `ms-swift` is not available in `got`, install it there rather than in another environment.
