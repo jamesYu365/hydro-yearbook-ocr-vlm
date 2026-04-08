@@ -19,12 +19,30 @@ Reference code:
 - use the Linux `got` conda environment
 - keep GOT reference code under `references/`
 - keep this repository's adapters under `scripts/models/got_ocr2/`
+- use `sdpa` as the stable attention backend on this machine
 
 If you need a reproducible Linux setup, start with:
 
 ```bash
 bash ./scripts/setup_ocr_env.sh
 ```
+
+Then verify the result against the current stable path documented in [environment-setup.md](/home/yubin/py_prj/yearbook_VLM/docs/environment-setup.md). Do not reintroduce `flash-attn`, `bitsandbytes==0.41.0`, or `peft==0.4.0` into the environment.
+
+## Current Verified Status
+
+The current verified training state as of 2026-04-08 is:
+- tests pass in `got` with `6 passed`
+- synthetic data smoke generation has passed
+- real test manifest generation has passed with 35 records
+- `train_swift.jsonl` and `val_swift.jsonl` have been built successfully
+- a GOT-OCR2.0 LoRA smoke training run has succeeded with `sdpa`
+
+Recorded smoke run:
+- output directory: `outputs/got_ocr2_v0_smoke_sdpa/v0-20260408-133207`
+- checkpoint: `outputs/got_ocr2_v0_smoke_sdpa/v0-20260408-133207/checkpoint-1`
+- train loss around `0.2235`
+- eval loss around `0.2534`
 
 ## Data Preparation
 
@@ -76,6 +94,11 @@ Reason:
 - `sdpa` is currently more reliable than `flash-attn` on this machine
 - `batch_size=1` leaves headroom for longer sequences and evaluation
 - `grad_acc=2` gives a useful global batch without pushing 12GB cards too hard
+
+Known environment findings:
+- `bitsandbytes==0.41.0` blocked `swift` startup through `peft`
+- older `peft==0.4.0` was not compatible with the current `ms-swift` stack
+- `flash-attn==2.8.3` failed to load because it required `GLIBC_2.32` while the system provides `2.31`
 
 ## Training Command
 
@@ -195,3 +218,4 @@ python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/
 - The current repository already includes the data-prep and training adapter scripts.
 - Real test image extraction from the source PDF is still a separate task.
 - If `ms-swift` is not available in `got`, install it there rather than in another environment.
+- The next meaningful training milestone is the first full multi-GPU run, not another fresh environment bootstrap.

@@ -25,6 +25,14 @@ Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evalu
 - a per-station score table
 - representative failure cases
 
+## Current Verified Progress
+
+- unit tests are passing in `got`
+- synthetic data smoke generation has passed
+- the real test manifest has been built with 35 records
+- `train_swift.jsonl` and `val_swift.jsonl` have been built
+- a 1-step GOT-OCR2.0 LoRA smoke run has passed with `sdpa`
+
 ## Metrics
 
 - weighted score: 30% character accuracy + 70% cell accuracy
@@ -38,9 +46,8 @@ Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evalu
 
 ## Current Execution Order
 
-1. validate the Linux `got` environment
-2. run a small synthetic smoke test
-3. build train and validation `ms-swift` manifests
-4. extract real station-level table images from the PDF
-5. launch the first `GOT-OCR2.0` LoRA run
-6. evaluate on the real test set without output repair
+1. extract real station-level table images from the PDF
+2. launch the first full multi-GPU `GOT-OCR2.0` LoRA run
+3. run final inference on the real extracted test set
+4. evaluate on the real test set without output repair
+5. inspect representative failure cases and tag them

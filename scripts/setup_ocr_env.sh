@@ -19,9 +19,7 @@ conda run -n "$ENV_NAME" python -m pip install torch torchvision
 conda run -n "$ENV_NAME" python -m pip install \
   transformers==4.37.2 \
   deepspeed==0.12.3 \
-  peft==0.4.0 \
   accelerate==0.28.0 \
-  bitsandbytes==0.41.0 \
   sentencepiece \
   tokenizers==0.15.2 \
   timm==0.6.13 \
@@ -40,26 +38,30 @@ conda run -n "$ENV_NAME" python -m pip install \
   Pillow \
   PyYAML
 
-echo "[4/8] Installing flash-attn prerequisites"
-conda run -n "$ENV_NAME" python -m pip install ninja || true
-conda run -n "$ENV_NAME" python -m pip install flash-attn --no-build-isolation || true
-
-echo "[5/8] Installing ms-swift"
+echo "[4/8] Installing ms-swift"
 conda run -n "$ENV_NAME" python -m pip install -U ms-swift[llm]
 
-echo "[6/8] Installing local GOT reference"
+echo "[5/8] Installing local GOT reference"
 if [[ ! -d "$GOT_REF_DIR" ]]; then
   echo "GOT reference directory not found: $GOT_REF_DIR" >&2
   exit 1
 fi
 conda run -n "$ENV_NAME" python -m pip install -e "$GOT_REF_DIR"
 
-echo "[7/8] Verifying key imports"
+echo "[6/8] Verifying key imports"
 conda run -n "$ENV_NAME" python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
 conda run -n "$ENV_NAME" python -c "import transformers; print('transformers', transformers.__version__)"
 conda run -n "$ENV_NAME" python -c "import swift; print('swift ok')"
 conda run -n "$ENV_NAME" python -c "import deepspeed; print('deepspeed ok')"
 conda run -n "$ENV_NAME" python -c "import GOT; print('got ok')"
 
-echo "[8/8] Done"
+echo "[7/8] Running tests"
+conda run -n "$ENV_NAME" pytest -q
+
+echo "[8/8] Notes"
+echo "Stable path on this machine:"
+echo "- use LoRA with ms-swift"
+echo "- use sdpa instead of flash-attn"
+echo "- do not pin peft==0.4.0"
+echo "- do not install bitsandbytes==0.41.0 for this path"
 echo "Activate with: conda activate $ENV_NAME"

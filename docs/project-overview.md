@@ -21,6 +21,7 @@ The repository is no longer documentation-only. The current implemented pieces a
 - strict CSV evaluation under `scripts/eval/`
 - a Linux environment setup script under `scripts/`
 - basic tests under `tests/`
+- a validated `swift sft` wrapper under `scripts/models/got_ocr2/`
 
 Existing generated artifacts under `data/` already include:
 - small synthetic sample images
@@ -28,6 +29,13 @@ Existing generated artifacts under `data/` already include:
 - synthetic manifests
 - a real test manifest
 - a `ms-swift` manifest preview
+
+The current verified status as of 2026-04-08 is:
+- `conda run -n got pytest -q` passes with `6 passed`
+- synthetic data generation smoke test has passed
+- real test manifest generation has passed with 35 records
+- `train_swift.jsonl` and `val_swift.jsonl` have been built successfully
+- a GOT-OCR2.0 LoRA smoke training run has succeeded with `sdpa`
 
 ## v0 Scope
 
@@ -42,9 +50,23 @@ The current v0 direction is intentionally narrow:
 ## Current Gaps
 
 The main remaining execution gaps are:
-- validate the Linux training stack inside the `got` conda environment
 - extract real PDF pages into station-level single-table images
-- launch the first `GOT-OCR2.0` LoRA fine-tuning run
+- launch the first full multi-GPU `GOT-OCR2.0` LoRA fine-tuning run
+- run final inference and strict evaluation on real extracted table images
+
+## Current Recommended Training Route
+
+The current stable route is:
+- use the `got` conda environment
+- use `ms-swift + LoRA`
+- use `sdpa`, not `flash-attn`
+- use project-local caches under `outputs/cache/`
+- launch through `scripts/models/got_ocr2/run_swift_sft.sh`
+
+Important environment findings from the verified smoke run:
+- `bitsandbytes==0.41.0` blocked `swift` startup through `peft`
+- older `peft==0.4.0` was not compatible with the current `ms-swift` setup
+- `flash-attn==2.8.3` failed to load because its binary required `GLIBC_2.32` while the system provides `2.31`
 
 ## Data Notes
 

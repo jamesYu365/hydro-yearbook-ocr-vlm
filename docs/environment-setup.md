@@ -12,13 +12,24 @@ Prepare a Linux `got` conda environment that can run:
 
 Use a clean Linux environment instead of reusing a mismatched local setup.
 
-Recommended target versions:
+Recommended baseline:
 - Python 3.10
 - CUDA-compatible PyTorch
 - `transformers==4.37.2`
 - `deepspeed==0.12.3`
-- `peft==0.4.0`
 - `accelerate==0.28.0`
+- `ms-swift[llm]`
+
+Verified stable path on this machine:
+- environment: `got`
+- attention backend: `sdpa`
+- fine-tuning method: LoRA
+- test command: `conda run -n got pytest -q`
+
+Avoid on the current machine:
+- `flash-attn`
+- `bitsandbytes==0.41.0`
+- `peft==0.4.0`
 
 ## System Checks
 
@@ -45,33 +56,30 @@ conda activate got
 
 ```bash
 pip install torch torchvision
-pip install transformers==4.37.2 deepspeed==0.12.3 peft==0.4.0 accelerate==0.28.0 bitsandbytes==0.41.0
+pip install transformers==4.37.2 deepspeed==0.12.3 accelerate==0.28.0
 pip install sentencepiece tokenizers==0.15.2 timm==0.6.13 einops==0.6.1 einops-exts==0.0.4
 pip install markdown2[all] numpy requests wandb shortuuid httpx==0.24.0 albumentations opencv-python scikit-learn==1.2.2 tiktoken==0.6.0
 pip install Pillow PyYAML pytest
-```
-
-## Flash Attention
-
-```bash
-pip install ninja
-pip install flash-attn --no-build-isolation
-```
-
-If `flash-attn` fails, keep moving with a smoke test first, then come back to optimize.
-
-## ms-swift
-
-```bash
 pip install -U ms-swift[llm]
 ```
 
-## Install Local GOT Reference
+Install the local GOT reference after the Python stack is in place:
 
 ```bash
 cd /path/to/yearbook_VLM/references/GOT-OCR2.0-main/GOT-OCR-2.0-master
 pip install -e .
 ```
+
+If `ms-swift` installs a newer compatible `peft`, keep that version. Do not pin `peft==0.4.0` back into the environment.
+
+## Attention Backend
+
+Use `sdpa` as the current default backend.
+
+Do not treat `flash-attn` as part of the stable setup on this machine:
+- `flash-attn==2.8.3` failed to load because it required `GLIBC_2.32`
+- the current system `glibc` is `2.31`
+- the smoke training run succeeded without `flash-attn`
 
 ## Verification
 
@@ -87,6 +95,10 @@ python -c "import deepspeed; print('deepspeed ok')"
 python -c "import GOT; print('got ok')"
 pytest -q
 ```
+
+Current verified result on this project:
+- `conda run -n got pytest -q`
+- output: `6 passed`
 
 ## Chinese Fonts
 
@@ -122,6 +134,13 @@ Then run:
 bash ./scripts/models/got_ocr2/run_swift_sft.sh
 ```
 
+The current wrapper defaults already match the stable path:
+- `ATTN_IMPL=sdpa`
+- `NPROC_PER_NODE=8`
+- `BATCH_SIZE=1`
+- `EVAL_BATCH_SIZE=1`
+- `GRAD_ACC_STEPS=2`
+
 If you want the downloaded base model and runtime caches to stay inside the repository instead of under your home directory, keep using the wrapper above.
 It writes caches under:
 
@@ -136,3 +155,4 @@ outputs/cache/
 - Keep project adapters and automation in this repository.
 - Ensure the synthetic renderer is using a Chinese-capable font before generating the final dataset.
 - Real test image extraction from the source PDF is still a separate step.
+- A Linux kernel warning below `5.5.0` was observed during training logs. It did not block the smoke run, but longer runs should be monitored.

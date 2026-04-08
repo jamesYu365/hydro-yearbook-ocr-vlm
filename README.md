@@ -30,22 +30,38 @@ Current v0 decisions:
 
 ## Current Status
 
-Repository status as of the current Linux migration:
+Repository status as of 2026-04-08:
 - source PDFs and calibrated CSV labels are stored under `datasets/`
 - calibrated CSV files are treated as source-of-truth labels
 - the main documentation set under `docs/` is in place
-- v0 synthetic data generation is scaffolded
-- real flow test manifest generation is scaffolded
-- `ms-swift` manifest conversion for `GOT-OCR2.0` is scaffolded
-- strict CSV evaluation is implemented
+- v0 synthetic data generation is implemented and smoke-tested
+- real flow test manifest generation is implemented and smoke-tested
+- `ms-swift` manifest conversion for `GOT-OCR2.0` is implemented and smoke-tested
+- strict CSV evaluation is implemented and covered by tests
 - a Linux environment setup script is included
-- a `swift sft` wrapper for `GOT-OCR2.0` is included
+- a `swift sft` wrapper for `GOT-OCR2.0` is included and validated on a smoke run
 - small sample outputs and manifest previews already exist under `data/`
+- `conda run -n got pytest -q` passes with `6 passed`
+- a GOT-OCR2.0 LoRA smoke run already succeeded with `sdpa`
 
 Still missing:
-- full Linux training environment validation in the `got` conda environment
 - real PDF to single-table image extraction for the final test set
-- the first end-to-end `GOT-OCR2.0` LoRA fine-tuning run
+- the first full multi-GPU `GOT-OCR2.0` LoRA training run
+- final inference and strict evaluation on real extracted table images
+
+## Verified Stable Path
+
+The current recommended path is:
+- conda env: `got`
+- training method: `ms-swift + LoRA`
+- attention backend: `sdpa`
+- cache root: `outputs/cache/`
+- wrapper entrypoint: `scripts/models/got_ocr2/run_swift_sft.sh`
+
+Known environment findings from the validated smoke run:
+- do not rely on `flash-attn` on this machine
+- do not use `bitsandbytes==0.41.0` for this path
+- older `peft==0.4.0` is not compatible with the current `ms-swift` setup
 
 ## Data Snapshot
 
@@ -94,13 +110,13 @@ python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/
 ```
 
 These scripts are implemented, but they require a suitable Python 3.10+ environment and the training stack is not yet validated end to end on this machine.
+These scripts are implemented. The current machine has already passed data-prep, tests, and a 1-step GOT-OCR2.0 LoRA smoke run in the `got` environment.
 
 ## Roadmap
 
 Near-term execution order:
-- validate the Linux `got` environment and run a smoke test
 - extract real PDF pages into single-table station images
-- launch the first `GOT-OCR2.0` LoRA fine-tuning run
+- launch the first full `GOT-OCR2.0` LoRA fine-tuning run
 - evaluate on the real flow test set with strict raw-output scoring
 - inspect representative failure cases and decide the next iteration
 

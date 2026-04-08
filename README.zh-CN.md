@@ -30,22 +30,38 @@ v0 任务固定为：
 
 ## 当前状态
 
-切换到 Linux 后，仓库当前状态如下：
+截至 2026-04-08，仓库当前状态如下：
 - 原始 PDF 和人工校准 CSV 位于 `datasets/`
 - 已将校准 CSV 作为 source-of-truth 标签
 - `docs/` 下的主文档已补齐
-- v0 合成数据生成脚手架已完成
-- 真实流量测试 manifest 构建脚手架已完成
-- 面向 `GOT-OCR2.0` 的 `ms-swift` manifest 转换已完成
-- 严格 CSV 评测脚本已实现
+- v0 合成数据生成已实现并通过 smoke test
+- 真实流量测试 manifest 构建已实现并通过 smoke test
+- 面向 `GOT-OCR2.0` 的 `ms-swift` manifest 转换已实现并通过 smoke test
+- 严格 CSV 评测脚本已实现，并有测试覆盖
 - Linux 环境安装脚本已提供
-- `swift sft` 训练包装脚本已提供
+- `swift sft` 训练包装脚本已提供，并已完成 smoke run 验证
 - `data/` 下已有小规模样本与 manifest 预览产物
+- `conda run -n got pytest -q` 当前结果为 `6 passed`
+- 一次基于 `sdpa` 的 GOT-OCR2.0 LoRA smoke training 已经跑通
 
 当前仍未完成：
-- 在 `got` conda 环境中真正装通并验证 Linux 训练环境
 - 将真实 PDF 裁成站点级单表图像
-- 启动第一轮 `GOT-OCR2.0` LoRA 微调
+- 启动第一轮完整的多卡 `GOT-OCR2.0` LoRA 微调
+- 在真实裁切表格图像上完成最终推理与严格评测
+
+## 当前稳定路径
+
+当前推荐的稳定路径是：
+- conda 环境：`got`
+- 训练方法：`ms-swift + LoRA`
+- attention backend：`sdpa`
+- 缓存目录：`outputs/cache/`
+- 训练入口：`scripts/models/got_ocr2/run_swift_sft.sh`
+
+已验证出的环境结论：
+- 当前机器不应依赖 `flash-attn`
+- 这一条训练路径不应使用 `bitsandbytes==0.41.0`
+- 较旧的 `peft==0.4.0` 与当前 `ms-swift` 组合不兼容
 
 ## 数据快照
 
@@ -93,14 +109,13 @@ python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests
 python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/got_ocr2_v0.jsonl --output outputs/reports/got_ocr2_v0_eval.json
 ```
 
-这些脚本已经在仓库中实现，但需要 Python 3.10+ 环境；本机上的训练栈还没有完成端到端验证。
+这些脚本已经在仓库中实现，并且本机已在 `got` 环境中完成数据准备、测试和 1-step GOT-OCR2.0 LoRA smoke run 验证。
 
 ## 路线图
 
 近期执行顺序：
-- 在 Linux `got` 环境中完成 smoke test
 - 完成真实 PDF 到站点级单表图像的提取
-- 启动第一轮 `GOT-OCR2.0` LoRA 微调
+- 启动第一轮完整的 `GOT-OCR2.0` LoRA 微调
 - 在真实流量测试集上完成严格评测
 - 基于代表性失败案例决定下一轮迭代
 
