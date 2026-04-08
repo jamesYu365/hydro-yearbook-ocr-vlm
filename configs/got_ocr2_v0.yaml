@@ -1,0 +1,36 @@
+experiment:
+  name: got_ocr2_flow_v0
+  task: single_table_image_to_csv
+  language: zh
+
+model:
+  name: GOT-OCR2.0
+  prompt: |
+    Read the table in the image and output only CSV text.
+    Keep the original comma-separated structure.
+    Keep empty rows and empty cells exactly as shown.
+    Do not add explanations, titles, markdown fences, or extra text.
+    Do not normalize number formats.
+    Do not fill in missing values.
+
+training:
+  method: qlora
+  seen_samples: 10000
+  val_source: synthetic
+  test_source: real_flow_test_only
+  checkpoint_selection: synthetic_val_weighted_score
+  weighted_score:
+    character_accuracy: 0.3
+    cell_accuracy: 0.7
+
+data:
+  synthetic_manifest_train: data/manifests/flow_v0/train.jsonl
+  synthetic_manifest_val: data/manifests/flow_v0/val.jsonl
+  real_test_manifest: data/manifests/flow_real_test.jsonl
+  layout_format: json
+
+render:
+  font_path: /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+  image_width: 1800
+  image_height: 2200
+  cell_padding: 10

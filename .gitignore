@@ -1,0 +1,30 @@
+# Project-local generated data
+/data/
+/datasets/
+/outputs/
+
+# External references and downloaded code
+/references/
+
+# Python cache and virtual env artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Notebook and editor metadata
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+
+# Local environment files
+.env
+.venv/
+venv/
+.codex
+
+# Training and runtime logs
+*.log
