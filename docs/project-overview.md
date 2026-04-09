@@ -36,6 +36,7 @@ The current verified status as of 2026-04-08 is:
 - real test manifest generation has passed with 35 records
 - `train_swift.jsonl` and `val_swift.jsonl` have been built successfully
 - a GOT-OCR2.0 LoRA smoke training run has succeeded with `sdpa`
+- single-GPU training is the currently verified stable baseline route on this machine
 
 ## v0 Scope
 
@@ -51,7 +52,7 @@ The current v0 direction is intentionally narrow:
 
 The main remaining execution gaps are:
 - extract real PDF pages into station-level single-table images
-- launch the first full multi-GPU `GOT-OCR2.0` LoRA fine-tuning run
+- launch the first full baseline training run and collect the first durable checkpoints
 - run final inference and strict evaluation on real extracted table images
 
 ## Current Recommended Training Route
@@ -62,11 +63,16 @@ The current stable route is:
 - use `sdpa`, not `flash-attn`
 - use project-local caches under `outputs/cache/`
 - launch through `scripts/models/got_ocr2/run_swift_sft.sh`
+- use single-GPU training as the official baseline route on this machine
+- only treat multi-GPU as experimental for now
 
 Important environment findings from the verified smoke run:
 - `bitsandbytes==0.41.0` blocked `swift` startup through `peft`
 - older `peft==0.4.0` was not compatible with the current `ms-swift` setup
 - `flash-attn==2.8.3` failed to load because its binary required `GLIBC_2.32` while the system provides `2.31`
+- `device_map=auto` did not actually shard GOT-OCR2.0 across all GPUs in this environment
+- `LoRA + gradient checkpointing + DDP(device_map)` triggered a backward compatibility error
+- explicit ZeRO2 configuration was parsed successfully, but 8-GPU smoke runs still failed to enter stable training on this machine
 
 ## Data Notes
 

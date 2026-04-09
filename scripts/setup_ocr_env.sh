@@ -10,8 +10,12 @@ command -v git >/dev/null
 command -v gcc >/dev/null
 command -v conda >/dev/null
 
-echo "[2/8] Creating conda environment: $ENV_NAME"
-conda create -n "$ENV_NAME" python=3.10 -y
+echo "[2/8] Preparing conda environment: $ENV_NAME"
+if conda env list | awk '{print $1}' | grep -qx "$ENV_NAME"; then
+  echo "Reusing existing conda environment: $ENV_NAME"
+else
+  conda create -n "$ENV_NAME" python=3.10 -y
+fi
 
 echo "[3/8] Installing Python packages"
 conda run -n "$ENV_NAME" python -m pip install --upgrade pip
@@ -36,7 +40,8 @@ conda run -n "$ENV_NAME" python -m pip install \
   scikit-learn==1.2.2 \
   tiktoken==0.6.0 \
   Pillow \
-  PyYAML
+  PyYAML \
+  pytest
 
 echo "[4/8] Installing ms-swift"
 conda run -n "$ENV_NAME" python -m pip install -U ms-swift[llm]

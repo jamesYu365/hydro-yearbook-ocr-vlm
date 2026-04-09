@@ -37,6 +37,7 @@ The current verified training state as of 2026-04-08 is:
 - real test manifest generation has passed with 35 records
 - `train_swift.jsonl` and `val_swift.jsonl` have been built successfully
 - a GOT-OCR2.0 LoRA smoke training run has succeeded with `sdpa`
+- single-GPU training has been validated as the current stable route on this machine
 
 Recorded smoke run:
 - output directory: `outputs/got_ocr2_v0_smoke_sdpa/v0-20260408-133207`
@@ -81,12 +82,32 @@ Suggested v0 defaults:
 - train source: synthetic only
 - val source: synthetic holdout
 - test source: real flow tables only
+- stable baseline route on this machine: single GPU
 
-For the current `8 x 12GB` GPU setup, the recommended starting point is:
-- DDP: `NPROC_PER_NODE=8`
+For the current official baseline on this machine, the recommended starting point is:
+- `CUDA_VISIBLE_DEVICES=0`
+- `NPROC_PER_NODE=1`
 - per-device train batch size: `1`
 - per-device eval batch size: `1`
 - gradient accumulation steps: `2`
+- max length: `4096`
+- `ATTN_IMPL=sdpa`
+- gradient checkpointing with `use_reentrant=false`
+
+Reason:
+- the current flow-table manifests are well below `4096` total sequence length in practice
+- `4096` ran successfully on a single GPU
+- single-GPU training avoids the current multi-GPU parallelism instability on this machine
+
+For the current `8 x 12GB` GPU setup, the recommended starting point is:
+- DDP: `NPROC_PER_NODE=8`
+- DeepSpeed: `configs/deepspeed_zero2.json`
+- per-device train batch size: `1`
+- per-device eval batch size: `1`
+- gradient accumulation steps: `2`
+- max length: `3072`
+- `ddp_find_unused_parameters=false`
+- gradient checkpointing with `use_reentrant=false`
 - effective global train batch size: `16`
 
 Reason:
@@ -94,11 +115,17 @@ Reason:
 - `sdpa` is currently more reliable than `flash-attn` on this machine
 - `batch_size=1` leaves headroom for longer sequences and evaluation
 - `grad_acc=2` gives a useful global batch without pushing 12GB cards too hard
+- `3072` is a safer default than `4096` on `12GB` TITAN V cards
+- non-reentrant gradient checkpointing is safer with DDP than the default reentrant mode for this model
 
 Known environment findings:
 - `bitsandbytes==0.41.0` blocked `swift` startup through `peft`
 - older `peft==0.4.0` was not compatible with the current `ms-swift` stack
 - `flash-attn==2.8.3` failed to load because it required `GLIBC_2.32` while the system provides `2.31`
+- `device_map=auto` should not be used as the multi-GPU training strategy here
+- `device_map=auto` resolved to `model.hf_device_map: {'': 7}` in this environment, so the model was not actually sharded across all GPUs
+- `LoRA + gradient checkpointing + DDP(device_map)` triggered `Expected to mark a variable ready only once`
+- explicit ZeRO2 config parsing worked, but the 8-GPU smoke attempt still hung before producing `logging.jsonl`
 
 ## Training Command
 
@@ -110,6 +137,14 @@ bash ./scripts/models/got_ocr2/run_swift_sft.sh
 
 Or run `swift sft` directly if needed.
 
+The wrapper now follows the same CLI style as the verified successful smoke command:
+- it passes `--model`
+- it passes `--train_type lora`
+
+For compatibility with older local shell habits:
+- `MODEL` is the primary environment variable
+- `MODEL_ID` is still accepted as a fallback alias by the wrapper
+
 The wrapper is already set up for multi-GPU DDP through `ms-swift`.
 `swift` will invoke distributed launch automatically when `NPROC_PER_NODE` is set.
 
@@ -118,12 +153,35 @@ Recommended multi-GPU example:
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
 NPROC_PER_NODE=8 \
+DEEPSPEED_CONFIG=configs/deepspeed_zero2.json \
 BATCH_SIZE=1 \
 EVAL_BATCH_SIZE=1 \
 GRAD_ACC_STEPS=2 \
 ATTN_IMPL=sdpa \
+MAX_LENGTH=3072 \
+DDP_FIND_UNUSED_PARAMETERS=false \
+GRADIENT_CHECKPOINTING=true \
+GRADIENT_CHECKPOINTING_KWARGS='{"use_reentrant": false}' \
 SAVE_STEPS=200 \
 EVAL_STEPS=200 \
+LOGGING_STEPS=20 \
+bash ./scripts/models/got_ocr2/run_swift_sft.sh
+```
+
+Recommended single-GPU baseline example:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 \
+NPROC_PER_NODE=1 \
+BATCH_SIZE=1 \
+EVAL_BATCH_SIZE=1 \
+GRAD_ACC_STEPS=2 \
+ATTN_IMPL=sdpa \
+MAX_LENGTH=4096 \
+GRADIENT_CHECKPOINTING=true \
+GRADIENT_CHECKPOINTING_KWARGS='{"use_reentrant": false}' \
+SAVE_STEPS=20 \
+EVAL_STEPS=20 \
 LOGGING_STEPS=20 \
 bash ./scripts/models/got_ocr2/run_swift_sft.sh
 ```
@@ -136,6 +194,28 @@ If memory is still tight, reduce pressure in this order:
 If the run is stable and GPU memory headroom remains, the next thing to try is:
 - keep `BATCH_SIZE=1`
 - raise `GRAD_ACC_STEPS` from `2` to `4`
+- then consider raising `MAX_LENGTH` from `3072` to `4096`
+
+If you hit a DDP error like `Expected to mark a variable ready only once`, first try:
+- keep `DDP_FIND_UNUSED_PARAMETERS=false`
+- keep `GRADIENT_CHECKPOINTING_KWARGS='{"use_reentrant": false}'`
+
+If it still happens, the next fallback is:
+- `GRADIENT_CHECKPOINTING=false`
+
+Avoid this for training on the current machine:
+- single-process pseudo-multi-GPU with `device_map=auto`
+
+Preferred direction for the next multi-GPU attempt:
+- standard multi-process launch with `NPROC_PER_NODE=8`
+- `--deepspeed configs/deepspeed_zero2.json`
+- `ATTN_IMPL=sdpa`
+- `GRADIENT_CHECKPOINTING_KWARGS='{"use_reentrant": false}'`
+- `MAX_LENGTH=3072`
+
+Current recommendation:
+- proceed with the single-GPU baseline first
+- treat multi-GPU tuning as a separate follow-up task
 
 ## Model Weights And Cache
 
@@ -157,6 +237,8 @@ The wrapper now defaults to a project-local cache root:
 ```bash
 outputs/cache/
 ```
+
+This project should keep using `outputs/cache/` as the unified cache location for training runs.
 
 Inside that cache root, the important locations are:
 

@@ -17,9 +17,13 @@ training:
   method: lora
   attn_impl: sdpa
   ddp_gpus: 8
+  ddp_find_unused_parameters: false
   per_device_train_batch_size: 1
   per_device_eval_batch_size: 1
   gradient_accumulation_steps: 2
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
   seen_samples: 10000
   val_source: synthetic
   test_source: real_flow_test_only

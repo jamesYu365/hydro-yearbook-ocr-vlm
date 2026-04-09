@@ -137,9 +137,13 @@ bash ./scripts/models/got_ocr2/run_swift_sft.sh
 The current wrapper defaults already match the stable path:
 - `ATTN_IMPL=sdpa`
 - `NPROC_PER_NODE=8`
+- `DEEPSPEED_CONFIG=configs/deepspeed_zero2.json`
 - `BATCH_SIZE=1`
 - `EVAL_BATCH_SIZE=1`
 - `GRAD_ACC_STEPS=2`
+- `MAX_LENGTH=3072`
+- `DDP_FIND_UNUSED_PARAMETERS=false`
+- `GRADIENT_CHECKPOINTING_KWARGS='{"use_reentrant": false}'`
 
 If you want the downloaded base model and runtime caches to stay inside the repository instead of under your home directory, keep using the wrapper above.
 It writes caches under:
@@ -156,3 +160,4 @@ outputs/cache/
 - Ensure the synthetic renderer is using a Chinese-capable font before generating the final dataset.
 - Real test image extraction from the source PDF is still a separate step.
 - A Linux kernel warning below `5.5.0` was observed during training logs. It did not block the smoke run, but longer runs should be monitored.
+- Avoid using `device_map=auto` as the training parallelism strategy for multi-GPU fine-tuning.
