@@ -1,6 +1,7 @@
 # Project-local generated data
 /data/
-/datasets/
+/datasets/*
+!/datasets/extract_station_tables.py
 /outputs/
 
 # External references and downloaded code

@@ -36,6 +36,7 @@ Repository status as of 2026-04-08:
 - the main documentation set under `docs/` is in place
 - v0 synthetic data generation is implemented and smoke-tested
 - real flow test manifest generation is implemented and smoke-tested
+- real PDF page rendering and layout-based station-table extraction are implemented
 - `ms-swift` manifest conversion for `GOT-OCR2.0` is implemented and smoke-tested
 - strict CSV evaluation is implemented and covered by tests
 - a Linux environment setup script is included
@@ -45,8 +46,8 @@ Repository status as of 2026-04-08:
 - a GOT-OCR2.0 LoRA smoke run already succeeded with `sdpa`
 
 Still missing:
-- real PDF to single-table image extraction for the final test set
 - the first full multi-GPU `GOT-OCR2.0` LoRA training run
+- alignment from extracted station tables to calibrated CSV labels
 - final inference and strict evaluation on real extracted table images
 
 ## Verified Stable Path
@@ -68,6 +69,7 @@ Known environment findings from the validated smoke run:
 Data notes:
 - `datasets/流量/` contains the current v0 target data
 - `datasets/水位/` is present but out of scope for v0
+- `datasets/derived/` stores generated real-test extraction outputs
 - some CSV files use local Chinese encodings rather than UTF-8
 - original filenames encode station, year, and river context and should be preserved
 
@@ -98,6 +100,7 @@ Use the Linux `got` conda environment for this project.
 2. Review the v0 data contract in [docs/data-spec.md](docs/data-spec.md)
 3. Check environment requirements in [docs/environment-setup.md](docs/environment-setup.md)
 4. Inspect the calibrated CSV labels under `datasets/流量/2006/`
+5. Review real-test extraction in [docs/real-test-extraction.md](docs/real-test-extraction.md)
 
 Representative commands:
 
@@ -127,6 +130,7 @@ Near-term execution order:
 - [Synthetic Data](docs/synthetic-data.md)
 - [Experiment Plan](docs/experiment-plan.md)
 - [Environment Setup](docs/environment-setup.md)
+- [Real Test Extraction](docs/real-test-extraction.md)
 - [GOT-OCR2.0 Fine-tuning](docs/got-ocr2-finetune.md)
 - [Contributor Guide](AGENTS.md)
 

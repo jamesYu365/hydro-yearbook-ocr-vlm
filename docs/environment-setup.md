@@ -8,6 +8,11 @@ Prepare a Linux `got` conda environment that can run:
 - `ms-swift` LoRA fine-tuning
 - strict CSV evaluation
 
+Prepare a separate Linux `rapid` conda environment that can run:
+- real PDF page rendering
+- page-level layout detection
+- station-level table cropping
+
 ## Recommended Baseline
 
 Use a clean Linux environment instead of reusing a mismatched local setup.
@@ -52,6 +57,13 @@ conda create -n got python=3.10 -y
 conda activate got
 ```
 
+For real-test extraction, use a separate environment:
+
+```bash
+conda create -n rapid python=3.10 -y
+conda activate rapid
+```
+
 ## Python Dependencies
 
 ```bash
@@ -71,6 +83,24 @@ pip install -e .
 ```
 
 If `ms-swift` installs a newer compatible `peft`, keep that version. Do not pin `peft==0.4.0` back into the environment.
+
+## Rapid Extraction Dependencies
+
+Install the extraction stack in `rapid`:
+
+```bash
+conda activate rapid
+pip install pymupdf opencv-python
+pip install rapid_table_det
+```
+
+Verify the extraction environment:
+
+```bash
+conda run -n rapid python -c "import fitz; print('fitz ok')"
+conda run -n rapid python -c "import cv2; print('cv2 ok')"
+conda run -n rapid python -c "from rapid_table_det.inference import TableDetector; print('rapid_table_det ok')"
+```
 
 ## Attention Backend
 
@@ -155,9 +185,10 @@ outputs/cache/
 ## Notes
 
 - Install everything inside the `got` environment.
+- Use the `rapid` environment for real-test PDF rendering and layout extraction.
 - Keep reference code under `references/`.
 - Keep project adapters and automation in this repository.
 - Ensure the synthetic renderer is using a Chinese-capable font before generating the final dataset.
-- Real test image extraction from the source PDF is still a separate step.
+- Real test extraction code lives under `datasets/`, and its outputs should stay under `datasets/derived/`.
 - A Linux kernel warning below `5.5.0` was observed during training logs. It did not block the smoke run, but longer runs should be monitored.
 - Avoid using `device_map=auto` as the training parallelism strategy for multi-GPU fine-tuning.

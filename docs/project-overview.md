@@ -14,6 +14,7 @@ The immediate v0 objective is:
 
 The repository is no longer documentation-only. The current implemented pieces are:
 - source PDFs and calibrated CSV labels under `datasets/`
+- real-test PDF page rendering and layout-based station-table extraction under `datasets/`
 - shared flow-table utilities under `scripts/common/`
 - synthetic flow-table generation under `scripts/data/`
 - real test manifest generation under `scripts/data/`
@@ -38,6 +39,12 @@ The current verified status as of 2026-04-08 is:
 - a GOT-OCR2.0 LoRA smoke training run has succeeded with `sdpa`
 - single-GPU training is the currently verified stable baseline route on this machine
 
+The current verified status as of 2026-04-13 additionally includes:
+- real-test PDF extraction ran successfully in the `rapid` environment
+- the `2006 流量` PDF rendered to `18` pages and yielded `35` station-level table crops
+- the `2014 水位` PDF rendered to `24` pages and yielded `47` station-level table crops
+- the current extraction run produced `0` logged layout failures
+
 ## v0 Scope
 
 The current v0 direction is intentionally narrow:
@@ -51,8 +58,8 @@ The current v0 direction is intentionally narrow:
 ## Current Gaps
 
 The main remaining execution gaps are:
-- extract real PDF pages into station-level single-table images
 - launch the first full baseline training run and collect the first durable checkpoints
+- align extracted station-table images with the calibrated labels
 - run final inference and strict evaluation on real extracted table images
 
 ## Current Recommended Training Route
@@ -84,6 +91,7 @@ Important environment findings from the verified smoke run:
 ## Code Organization
 
 The current code roles are:
+- `datasets/`: source data plus real-test extraction utilities and derived extraction outputs
 - `scripts/data/`: synthetic generation and real test manifest building
 - `scripts/models/`: model-specific adapters and training wrappers
 - `scripts/eval/`: strict evaluation
