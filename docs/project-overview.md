@@ -44,6 +44,10 @@ The current verified status as of 2026-04-13 additionally includes:
 - the `2006 流量` PDF rendered to `18` pages and yielded `35` station-level table crops
 - the `2014 水位` PDF rendered to `24` pages and yielded `47` station-level table crops
 - the current extraction run produced `0` logged layout failures
+- extracted real-test artifacts now include `station_tables_plain/`, `station_tables_buffered/`, and `title_rois/`
+- title OCR uses a dedicated ROI built from the upper buffer plus a small downward compensation
+- successful titles are cleaned to the prefix before `逐日平均流量表` or `逐日平均水位表`
+- final extracted filenames now use the form `稳定ID_标题_年份`
 
 ## v0 Scope
 

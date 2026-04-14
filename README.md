@@ -37,6 +37,7 @@ Repository status as of 2026-04-08:
 - v0 synthetic data generation is implemented and smoke-tested
 - real flow test manifest generation is implemented and smoke-tested
 - real PDF page rendering and layout-based station-table extraction are implemented
+- title-aware real-test extraction with `plain`, `buffered`, and `title_rois` outputs is implemented
 - `ms-swift` manifest conversion for `GOT-OCR2.0` is implemented and smoke-tested
 - strict CSV evaluation is implemented and covered by tests
 - a Linux environment setup script is included
@@ -70,6 +71,7 @@ Data notes:
 - `datasets/流量/` contains the current v0 target data
 - `datasets/水位/` is present but out of scope for v0
 - `datasets/derived/` stores generated real-test extraction outputs
+- extracted real-test images now use the form `稳定ID_标题_年份`
 - some CSV files use local Chinese encodings rather than UTF-8
 - original filenames encode station, year, and river context and should be preserved
 
@@ -118,7 +120,6 @@ These scripts are implemented. The current machine has already passed data-prep,
 ## Roadmap
 
 Near-term execution order:
-- extract real PDF pages into single-table station images
 - launch the first full `GOT-OCR2.0` LoRA fine-tuning run
 - evaluate on the real flow test set with strict raw-output scoring
 - inspect representative failure cases and decide the next iteration

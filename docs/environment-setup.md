@@ -92,6 +92,7 @@ Install the extraction stack in `rapid`:
 conda activate rapid
 pip install pymupdf opencv-python
 pip install rapid_table_det
+pip install rapidocr_onnxruntime
 ```
 
 Verify the extraction environment:
@@ -100,6 +101,7 @@ Verify the extraction environment:
 conda run -n rapid python -c "import fitz; print('fitz ok')"
 conda run -n rapid python -c "import cv2; print('cv2 ok')"
 conda run -n rapid python -c "from rapid_table_det.inference import TableDetector; print('rapid_table_det ok')"
+conda run -n rapid python -c "from rapidocr_onnxruntime import RapidOCR; print('rapidocr ok')"
 ```
 
 ## Attention Backend
@@ -190,5 +192,6 @@ outputs/cache/
 - Keep project adapters and automation in this repository.
 - Ensure the synthetic renderer is using a Chinese-capable font before generating the final dataset.
 - Real test extraction code lives under `datasets/`, and its outputs should stay under `datasets/derived/`.
+- Title OCR for extracted tables runs only on a dedicated title ROI built from the added top buffer strip plus a small downward compensation below the original table top.
 - A Linux kernel warning below `5.5.0` was observed during training logs. It did not block the smoke run, but longer runs should be monitored.
 - Avoid using `device_map=auto` as the training parallelism strategy for multi-GPU fine-tuning.

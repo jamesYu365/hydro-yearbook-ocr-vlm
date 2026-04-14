@@ -7,10 +7,14 @@ Extract station-level table images from the source yearbook PDFs for final-test 
 The current extraction step is:
 - render each PDF page to a page image
 - run layout detection on the page image
-- crop each detected table region into a station-level table image
+- save a plain crop from the detected table box
+- save a buffered crop with extra space added above the table
+- build a title ROI from the top buffer strip plus a few pixels below the original table top
+- run title OCR only on that title ROI
+- rename the three saved artifacts with the same final basename
 
 The current extraction step does not:
-- perform OCR
+- perform full-table OCR
 - split a station table into header/day/month/year sub-images
 - build the final inference manifest automatically
 
@@ -36,6 +40,7 @@ conda create -n rapid python=3.10 -y
 conda activate rapid
 pip install pymupdf opencv-python
 pip install rapid_table_det
+pip install rapidocr_onnxruntime
 ```
 
 Then verify:
@@ -44,6 +49,7 @@ Then verify:
 conda run -n rapid python -c "import fitz; print('fitz ok')"
 conda run -n rapid python -c "import cv2; print('cv2 ok')"
 conda run -n rapid python -c "from rapid_table_det.inference import TableDetector; print('rapid_table_det ok')"
+conda run -n rapid python -c "from rapidocr_onnxruntime import RapidOCR; print('rapidocr ok')"
 ```
 
 ## Script Location And Code Rules
@@ -75,7 +81,9 @@ datasets/derived/final_test_layout/
 
 For each PDF it creates:
 - `pages/`: rendered page images
-- `station_tables/`: cropped station-level table images
+- `station_tables_plain/`: plain table crops
+- `station_tables_buffered/`: buffered table crops
+- `title_rois/`: OCR input images for title recognition
 - `layout_detections.json`: page-level detection metadata
 - `layout_failures.jsonl`: per-page failures
 
@@ -88,6 +96,18 @@ Process the current default target PDFs:
 
 ```bash
 conda run -n rapid python datasets/extract_station_tables.py
+```
+
+Use a larger or smaller title buffer during tuning:
+
+```bash
+conda run -n rapid python datasets/extract_station_tables.py --title-buffer-px 220
+```
+
+Tune the small downward compensation under the title ROI:
+
+```bash
+conda run -n rapid python datasets/extract_station_tables.py --title-bottom-buffer-px 16
 ```
 
 Smoke-test only the first page of each PDF:
@@ -117,10 +137,18 @@ conda run -n rapid python datasets/extract_station_tables.py \
 
 ## Current Validated Result
 
-The extraction run completed successfully on 2026-04-13 with:
-- `流量 2006`: `18` pages and `35` cropped station tables
-- `水位 2014`: `24` pages and `47` cropped station tables
-- failure count: `0` for both PDFs
+The baseline extraction run completed successfully on 2026-04-13 with:
+- `流量 2006`: `18` pages and `35` detected station tables
+- `水位 2014`: `24` pages and `47` detected station tables
+- layout detection failure count: `0` for both PDFs
+
+Title OCR success is stricter than layout success:
+- `流量` titles only count as success if OCR text contains `逐日平均流量表`
+- `水位` titles only count as success if OCR text contains `逐日平均水位表`
+- final filenames use the form `稳定ID_标题_年份`
+- `标题` is extracted from the OCR text before `逐日平均流量表` or `逐日平均水位表`
+- the leading ordinal digit is removed from that extracted prefix
+- if the keyword is missing, adjust `--title-buffer-px` first and rerun a small page subset
 
 ## Next Step
 
