@@ -11,6 +11,7 @@ import cv2
 import fitz
 from rapid_table_det.inference import TableDetector
 from rapidocr_onnxruntime import RapidOCR
+from tqdm import tqdm
 
 
 DEFAULT_PDFS = [
@@ -272,6 +273,10 @@ def extract_title_prefix(recognized_title: str, expected_keyword: str) -> str:
     return prefix.strip()
 
 
+def log_info(message: str) -> None:
+    print(f"[extract_station_tables] {message}")
+
+
 def ensure_clean_output_dirs(*dirs: Path) -> None:
     for directory in dirs:
         directory.mkdir(parents=True, exist_ok=True)
@@ -319,6 +324,7 @@ def crop_tables_from_page(
     existing_buffered = list(buffered_crop_dir.glob(f"{page_stem}_table*.jpg"))
     existing_title_rois = list(title_roi_dir.glob(f"{page_stem}_table*.jpg"))
     if skip_existing_crops and existing_plain and existing_buffered and existing_title_rois:
+        log_info(f"Skip existing outputs for {page_stem}")
         return (
             {
                 "page_image_path": image_path.as_posix(),
@@ -340,6 +346,10 @@ def crop_tables_from_page(
     detections = sort_detections(detections)
     expected_keyword = expected_title_keyword(pdf_path)
     image_height, image_width = image.shape[:2]
+
+    log_info(
+        f"Page {page_stem}: detected {len(detections)} table(s), expected title keyword = {expected_keyword}"
+    )
 
     records: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -408,7 +418,13 @@ def crop_tables_from_page(
                         title=f"{stable_name}_{cleaned_title}_{year}",
                         fallback=final_basename,
                     )
+                    log_info(
+                        f"{stable_name}: title OCR success -> raw='{title_metadata['recognized_title_raw']}' clean='{cleaned_title}'"
+                    )
                 else:
+                    log_info(
+                        f"{stable_name}: title OCR failed, merged='{ocr_metadata['ocr_merged_text']}'"
+                    )
                     failures.append(
                         {
                             "pdf_path": pdf_path.as_posix(),
@@ -421,6 +437,7 @@ def crop_tables_from_page(
                     )
             except Exception as exc:
                 title_metadata["title_failure_reason"] = "title_ocr_runtime_error"
+                log_info(f"{stable_name}: title OCR runtime error: {exc}")
                 failures.append(
                     {
                         "pdf_path": pdf_path.as_posix(),
@@ -515,7 +532,12 @@ def process_pdf(
     page_records: list[dict[str, Any]] = []
     failure_records: list[dict[str, Any]] = []
 
-    for page_number, page_path in enumerate(rendered_pages, start=1):
+    log_info(
+        f"Start PDF {pdf_path.name}: {len(rendered_pages)} page(s), year={year}, top_buffer={title_buffer_px}, bottom_buffer={title_bottom_buffer_px}"
+    )
+
+    for page_number, page_path in enumerate(tqdm(rendered_pages, desc=f"{pdf_path.stem}", unit="page"), start=1):
+        log_info(f"Process page {page_number}/{len(rendered_pages)} -> {page_path.name}")
         try:
             page_record, page_failures = crop_tables_from_page(
                 image_path=page_path,
@@ -570,6 +592,10 @@ def process_pdf(
         if failure["reason"] in {"expected_keyword_missing", "empty_title_roi", "title_ocr_runtime_error"}
     )
 
+    log_info(
+        f"Finished PDF {pdf_path.name}: tables={total_tables}, title_ocr_success={total_title_ocr_success}, title_ocr_failure={title_ocr_failure_count}, failures={len(failure_records)}"
+    )
+
     metadata = {
         "pdf_path": pdf_path.as_posix(),
         "dpi": dpi,
@@ -611,6 +637,10 @@ def main() -> None:
         if not pdf_path.exists():
             raise FileNotFoundError(f"PDF not found: {pdf_path}")
 
+    log_info(f"Use output root: {args.output_root}")
+    log_info(
+        f"OCR config: det={args.ocr_det_model_path}, rec={args.ocr_rec_model_path}, cuda={args.ocr_cuda}, max_side_len={args.ocr_max_side_len}"
+    )
     detector = TableDetector()
     ocr_engine = init_ocr_engine(args)
     summaries = []
@@ -628,11 +658,12 @@ def main() -> None:
             title_bottom_buffer_px=args.title_bottom_buffer_px,
         )
         summaries.append(summary)
-        print(json.dumps(summary, ensure_ascii=False))
+        log_info(f"PDF summary: {json.dumps(summary, ensure_ascii=False)}")
 
     summary_path = args.output_root / "run_summary.json"
     args.output_root.mkdir(parents=True, exist_ok=True)
     summary_path.write_text(json.dumps(summaries, ensure_ascii=False, indent=2), encoding="utf-8")
+    log_info(f"Wrote run summary to {summary_path}")
 
 
 if __name__ == "__main__":

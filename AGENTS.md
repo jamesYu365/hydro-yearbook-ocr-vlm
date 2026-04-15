@@ -14,3 +14,4 @@ This repository is for fine-tuning and evaluating a VLM on hydrological yearbook
 - Use the `got` conda environment for this project.
 - Keep data-generation code and model-specific code in separate directories.
 - Do not ask the agent to run `git push` for this repository; the terminal may not have GitHub credentials configured. Remind the user to run `git push origin <branch>` manually when needed.
+- Commit messages must follow this format: one summary line, then a blank line, then flat bullet summaries for the key changes.
