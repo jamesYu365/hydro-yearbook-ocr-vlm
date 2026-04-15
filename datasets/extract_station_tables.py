@@ -74,13 +74,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--ocr-det-model-path",
         type=Path,
-        default=None,
+        default="./datasets/ONNX_models/ch_PP-OCRv5_det_server.onnx",
         help="Optional RapidOCR detection ONNX model path.",
     )
     parser.add_argument(
         "--ocr-rec-model-path",
         type=Path,
-        default=None,
+        default="./datasets/ONNX_models/ch_PP-OCRv5_rec_server.onnx",
         help="Optional RapidOCR recognition ONNX model path.",
     )
     parser.add_argument(
@@ -193,7 +193,7 @@ def expected_title_keyword(pdf_path: Path) -> str:
 
 
 def merge_title_lines(ocr_result: list[Any]) -> tuple[list[str], str]:
-    line_items: list[tuple[float, float, str]] = []
+    line_items: list[dict[str, Any]] = []
     for entry in ocr_result:
         if len(entry) < 2:
             continue
@@ -202,12 +202,46 @@ def merge_title_lines(ocr_result: list[Any]) -> tuple[list[str], str]:
         if not text:
             continue
         y_min = min(point[1] for point in points)
+        y_max = max(point[1] for point in points)
         x_min = min(point[0] for point in points)
-        line_items.append((y_min, x_min, text))
+        x_max = max(point[0] for point in points)
+        line_items.append(
+            {
+                "text": text,
+                "x_center": (x_min + x_max) / 2.0,
+                "y_center": (y_min + y_max) / 2.0,
+                "height": y_max - y_min,
+            }
+        )
 
-    ordered_texts = [item[2] for item in sorted(line_items, key=lambda item: (item[0], item[1]))]
-    merged_text = "".join(ordered_texts)
-    return ordered_texts, merged_text
+    if not line_items:
+        return [], ""
+
+    heights = sorted(item["height"] for item in line_items)
+    median_height = heights[len(heights) // 2]
+    row_tolerance = max(10.0, min(20.0, 0.4 * median_height))
+
+    rows: list[dict[str, Any]] = []
+    for item in sorted(line_items, key=lambda item: (item["y_center"], item["x_center"])):
+        matched_row = None
+        for row in rows:
+            if abs(item["y_center"] - row["y_center"]) <= row_tolerance:
+                matched_row = row
+                break
+        if matched_row is None:
+            rows.append({"y_center": item["y_center"], "items": [item]})
+            continue
+
+        matched_row["items"].append(item)
+        matched_row["y_center"] = sum(entry["y_center"] for entry in matched_row["items"]) / len(matched_row["items"])
+
+    ordered_lines: list[str] = []
+    for row in sorted(rows, key=lambda row: row["y_center"]):
+        row_items = sorted(row["items"], key=lambda item: item["x_center"])
+        ordered_lines.append("".join(item["text"] for item in row_items))
+
+    merged_text = "".join(ordered_lines)
+    return ordered_lines, merged_text
 
 
 def recognize_table_title(
@@ -217,11 +251,12 @@ def recognize_table_title(
 ) -> dict[str, Any]:
     ocr_result, _ = ocr_engine(title_region)
     ordered_lines, merged_text = merge_title_lines(ocr_result or [])
-    success = expected_keyword in merged_text
+    keyword_line = next((line for line in ordered_lines if expected_keyword in line), None)
+    success = keyword_line is not None
     return {
         "ocr_text_lines": ordered_lines,
         "ocr_merged_text": merged_text,
-        "recognized_title_raw": merged_text if success else None,
+        "recognized_title_raw": keyword_line if success else None,
         "title_ocr_success": success,
         "title_failure_reason": None if success else "expected_keyword_missing",
     }

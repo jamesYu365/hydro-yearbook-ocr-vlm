@@ -26,6 +26,7 @@ Thumbs.db
 .venv/
 venv/
 .codex
+.vscode/
 
 # Training and runtime logs
 *.log
