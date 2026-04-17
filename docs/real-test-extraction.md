@@ -18,6 +18,10 @@ The current extraction step does not:
 - split a station table into header/day/month/year sub-images
 - build the final inference manifest automatically
 
+The repository now also includes two follow-up scripts for `2006 流量`:
+- `datasets/crop_flow_table_daily_region.py`: crop existing `station_tables_plain/` images down to the daily-only region by anchoring on the upper `平均`, writing to `station_tables_daily/`
+- `datasets/build_real_flow_alignment.py`: score and align calibrated CSV labels to OCR-cropped JPG files and emit a real-test manifest plus an audit report
+
 ## Current Target PDFs
 
 The current validated inputs are:
@@ -155,3 +159,10 @@ Title OCR success is stricter than layout success:
 After extraction, the next dataset task is:
 - align cropped station-table images with the calibrated CSV labels
 - build the real final-test inference manifest from those aligned pairs
+
+Current helper commands for that step:
+
+```bash
+conda run -n rapid python datasets/crop_flow_table_daily_region.py
+python3 datasets/build_real_flow_alignment.py
+```

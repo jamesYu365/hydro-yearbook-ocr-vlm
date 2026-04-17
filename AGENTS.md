@@ -13,5 +13,7 @@ This repository is for fine-tuning and evaluating a VLM on hydrological yearbook
 - Treat calibrated CSV files as source-of-truth labels and preserve existing dataset filenames.
 - Use the `got` conda environment for this project.
 - Keep data-generation code and model-specific code in separate directories.
+- Keep dataset preprocessing, extraction, alignment, and crop-generation code under `datasets/` rather than `scripts/`.
+- Do not change the main algorithm for real-data preprocessing without explicit user confirmation; fallback or experimental paths must stay opt-in.
 - Do not ask the agent to run `git push` for this repository; the terminal may not have GitHub credentials configured. Remind the user to run `git push origin <branch>` manually when needed.
 - Commit messages must follow this format: one summary line, then a blank line, then flat bullet summaries for the key changes.

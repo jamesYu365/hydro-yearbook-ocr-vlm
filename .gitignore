@@ -2,6 +2,10 @@
 /data/
 /datasets/*
 !/datasets/extract_station_tables.py
+!/datasets/crop_flow_table_daily_region.py
+!/datasets/build_real_flow_alignment.py
+!/datasets/real_flow_test_prep.py
+!/datasets/__init__.py
 /outputs/
 
 # External references and downloaded code
