@@ -30,7 +30,7 @@ Current v0 decisions:
 
 ## Current Status
 
-Repository status as of 2026-04-08:
+Repository status as of 2026-04-17:
 - source PDFs and calibrated CSV labels are stored under `datasets/`
 - calibrated CSV files are treated as source-of-truth labels
 - the main documentation set under `docs/` is in place
@@ -38,6 +38,8 @@ Repository status as of 2026-04-08:
 - real flow test manifest generation is implemented and smoke-tested
 - real PDF page rendering and layout-based station-table extraction are implemented
 - title-aware real-test extraction with `plain`, `buffered`, and `title_rois` outputs is implemented
+- OCR-based daily-only crop generation for real `2006 流量` tables is implemented
+- scored alignment from extracted daily crops to calibrated `2006 流量` CSV labels is implemented
 - `ms-swift` manifest conversion for `GOT-OCR2.0` is implemented and smoke-tested
 - strict CSV evaluation is implemented and covered by tests
 - a Linux environment setup script is included
@@ -48,7 +50,6 @@ Repository status as of 2026-04-08:
 
 Still missing:
 - the first full multi-GPU `GOT-OCR2.0` LoRA training run
-- alignment from extracted station tables to calibrated CSV labels
 - final inference and strict evaluation on real extracted table images
 
 ## Verified Stable Path
@@ -72,6 +73,7 @@ Data notes:
 - `datasets/水位/` is present but out of scope for v0
 - `datasets/derived/` stores generated real-test extraction outputs
 - extracted real-test images now use the form `稳定ID_标题_年份`
+- `station_tables_daily/` is the current official OCR-cropped real-test image set for `2006 流量`
 - some CSV files use local Chinese encodings rather than UTF-8
 - original filenames encode station, year, and river context and should be preserved
 
@@ -84,6 +86,7 @@ Data notes:
 ├── datasets/                 # Source PDFs and calibrated CSV labels
 ├── docs/                     # Project notes and detailed specifications
 ├── references/               # External reference code and papers
+├── datasets/*.py             # Real-data extraction, crop, and alignment utilities
 ├── scripts/common/           # Shared flow-table utilities
 ├── scripts/data/             # Data prep and synthetic generation
 ├── scripts/eval/             # Evaluation
@@ -108,6 +111,8 @@ Representative commands:
 
 ```bash
 python3 ./scripts/data/build_real_test_manifest.py
+conda run -n rapid python ./datasets/crop_flow_table_daily_region.py
+python3 ./datasets/build_real_flow_alignment.py
 python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl

@@ -33,21 +33,28 @@ Each synthetic manifest row must include:
 
 Real flow tables are test-only in v0.
 
-The current real test manifest stores:
+The current aligned real test manifest stores:
 - `sample_id`
 - `station_name`
 - `river`
 - `year`
-- `pdf_path`
 - `csv_path`
 - `csv_encoding`
+- `image_path`
+- `title_text`
 - `target_csv`
+- `match_score`
+- `match_status`
 - `split`
 - `source`
 
 `source` is `real` and `split` is always `test`.
 
-The current manifest is label-based. A later extraction step will add the real station-level table images used for final inference.
+The current official real-test image set for `2006 流量` is `station_tables_daily/`, which is produced by the OCR-based daily-only crop path.
+
+The current aligned manifest is produced by:
+- `datasets/crop_flow_table_daily_region.py`
+- `datasets/build_real_flow_alignment.py`
 
 ## CSV Rules
 

@@ -30,12 +30,14 @@ v0 任务固定为：
 
 ## 当前状态
 
-截至 2026-04-08，仓库当前状态如下：
+截至 2026-04-17，仓库当前状态如下：
 - 原始 PDF 和人工校准 CSV 位于 `datasets/`
 - 已将校准 CSV 作为 source-of-truth 标签
 - `docs/` 下的主文档已补齐
 - v0 合成数据生成已实现并通过 smoke test
 - 真实流量测试 manifest 构建已实现并通过 smoke test
+- 真实 `2006 流量` 表的 OCR 日值裁切已实现
+- 已实现从真实日值裁切图到校准 CSV 的打分对齐
 - 面向 `GOT-OCR2.0` 的 `ms-swift` manifest 转换已实现并通过 smoke test
 - 严格 CSV 评测脚本已实现，并有测试覆盖
 - Linux 环境安装脚本已提供
@@ -45,7 +47,6 @@ v0 任务固定为：
 - 一次基于 `sdpa` 的 GOT-OCR2.0 LoRA smoke training 已经跑通
 
 当前仍未完成：
-- 将真实 PDF 裁成站点级单表图像
 - 启动第一轮完整的多卡 `GOT-OCR2.0` LoRA 微调
 - 在真实裁切表格图像上完成最终推理与严格评测
 
@@ -68,6 +69,7 @@ v0 任务固定为：
 数据说明：
 - `datasets/流量/` 是当前 v0 主目标数据
 - `datasets/水位/` 已存在，但不在 v0 范围内
+- `datasets/derived/` 下的 `station_tables_daily/` 是当前 `2006 流量` 正式真实测试图像集
 - 部分 CSV 使用本地中文编码而非 UTF-8
 - 文件名中编码了站点、年份和河流信息，应保持不变
 
@@ -80,6 +82,7 @@ v0 任务固定为：
 ├── datasets/                 # 原始 PDF 与已校准 CSV 标签
 ├── docs/                     # 项目说明与细化规范
 ├── references/               # 外部参考代码和论文
+├── datasets/*.py             # 真实数据抽取、裁切与对齐脚本
 ├── scripts/common/           # 流量表公共工具
 ├── scripts/data/             # 数据处理与合成数据生成
 ├── scripts/eval/             # 评测
@@ -103,6 +106,8 @@ v0 任务固定为：
 
 ```bash
 python3 ./scripts/data/build_real_test_manifest.py
+conda run -n rapid python ./datasets/crop_flow_table_daily_region.py
+python3 ./datasets/build_real_flow_alignment.py
 python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl
@@ -114,7 +119,6 @@ python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/
 ## 路线图
 
 近期执行顺序：
-- 完成真实 PDF 到站点级单表图像的提取
 - 启动第一轮完整的 `GOT-OCR2.0` LoRA 微调
 - 在真实流量测试集上完成严格评测
 - 基于代表性失败案例决定下一轮迭代
@@ -126,6 +130,7 @@ python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/
 - [合成数据方案](docs/synthetic-data.md)
 - [实验计划](docs/experiment-plan.md)
 - [环境配置](docs/environment-setup.md)
+- [真实测试抽取](docs/real-test-extraction.md)
 - [GOT-OCR2.0 微调](docs/got-ocr2-finetune.md)
 - [协作指南](AGENTS.md)
 

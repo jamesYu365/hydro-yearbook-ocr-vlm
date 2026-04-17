@@ -15,6 +15,8 @@ The immediate v0 objective is:
 The repository is no longer documentation-only. The current implemented pieces are:
 - source PDFs and calibrated CSV labels under `datasets/`
 - real-test PDF page rendering and layout-based station-table extraction under `datasets/`
+- OCR-based daily-only crop generation for real `2006 流量` tables under `datasets/`
+- scored alignment from extracted daily crops to calibrated `2006 流量` CSV labels under `datasets/`
 - shared flow-table utilities under `scripts/common/`
 - synthetic flow-table generation under `scripts/data/`
 - real test manifest generation under `scripts/data/`
@@ -49,6 +51,12 @@ The current verified status as of 2026-04-13 additionally includes:
 - successful titles are cleaned to the prefix before `逐日平均流量表` or `逐日平均水位表`
 - final extracted filenames now use the form `稳定ID_标题_年份`
 
+The current verified status as of 2026-04-17 additionally includes:
+- `station_tables_daily/` is the official OCR-cropped real-test image set for `2006 流量`
+- the default real-data alignment path now uses `datasets/build_real_flow_alignment.py`
+- the current aligned `2006 流量` audit reports `35` CSV files, `35` images, and `35` confirmed matches
+- real-data preprocessing, extraction, alignment, and crop-generation code now lives under `datasets/`
+
 ## v0 Scope
 
 The current v0 direction is intentionally narrow:
@@ -63,7 +71,6 @@ The current v0 direction is intentionally narrow:
 
 The main remaining execution gaps are:
 - launch the first full baseline training run and collect the first durable checkpoints
-- align extracted station-table images with the calibrated labels
 - run final inference and strict evaluation on real extracted table images
 
 ## Current Recommended Training Route
@@ -95,7 +102,7 @@ Important environment findings from the verified smoke run:
 ## Code Organization
 
 The current code roles are:
-- `datasets/`: source data plus real-test extraction utilities and derived extraction outputs
+- `datasets/`: source data plus real-test extraction, OCR crop, alignment utilities, and derived extraction outputs
 - `scripts/data/`: synthetic generation and real test manifest building
 - `scripts/models/`: model-specific adapters and training wrappers
 - `scripts/eval/`: strict evaluation
