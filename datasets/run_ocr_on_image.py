@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Any
 
 import cv2
-from rapidocr_onnxruntime import RapidOCR
 
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from datasets.paddle_ocr_common import init_paddle_ocr_engine, run_paddle_ocr
 from datasets.real_flow_test_prep import ocr_tokens_from_result
 
 
@@ -22,18 +22,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("image", type=Path, help="Image path to recognize.")
     parser.add_argument(
-        "--ocr-det-model-path",
-        type=Path,
-        default=Path("./datasets/ONNX_models/ch_PP-OCRv5_det_server.onnx"),
-        help="Optional RapidOCR detection ONNX model path.",
-    )
-    parser.add_argument(
-        "--ocr-rec-model-path",
-        type=Path,
-        default=Path("./datasets/ONNX_models/ch_PP-OCRv5_rec_server.onnx"),
-        help="Optional RapidOCR recognition ONNX model path.",
-    )
-    parser.add_argument(
         "--ocr-max-side-len",
         type=int,
         default=10000,
@@ -42,8 +30,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--ocr-cuda",
         choices=("auto", "on", "off"),
-        default="auto",
-        help="RapidOCR device policy. 'auto' tries CUDA first and falls back to CPU.",
+        default="on",
+        help="RapidOCR Paddle device policy. Default uses GPU 1 via CUDA_VISIBLE_DEVICES remapping.",
+    )
+    parser.add_argument(
+        "--ocr-device-id",
+        type=int,
+        default=1,
+        help="Physical GPU id to expose to Paddle. The script remaps this card to gpu:0 inside the process.",
     )
     parser.add_argument(
         "--json-output",
@@ -54,22 +48,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def init_ocr_engine(args: argparse.Namespace) -> RapidOCR:
-    kwargs: dict[str, Any] = {
-        "max_side_len": args.ocr_max_side_len,
-        "det_model_path": str(args.ocr_det_model_path),
-        "rec_model_path": str(args.ocr_rec_model_path),
-    }
-
-    if args.ocr_cuda == "off":
-        return RapidOCR(det_use_cuda=False, rec_use_cuda=False, **kwargs)
-    if args.ocr_cuda == "on":
-        return RapidOCR(det_use_cuda=True, rec_use_cuda=True, **kwargs)
-
-    try:
-        return RapidOCR(det_use_cuda=True, rec_use_cuda=True, **kwargs)
-    except Exception:
-        return RapidOCR(det_use_cuda=False, rec_use_cuda=False, **kwargs)
+def init_ocr_engine(args: argparse.Namespace) -> Any:
+    return init_paddle_ocr_engine(
+        max_side_len=args.ocr_max_side_len,
+        ocr_cuda=args.ocr_cuda,
+        ocr_device_id=args.ocr_device_id,
+    )
 
 
 def main() -> None:
@@ -79,7 +63,7 @@ def main() -> None:
         raise RuntimeError(f"Failed to load image: {args.image}")
 
     ocr_engine = init_ocr_engine(args)
-    ocr_result, _ = ocr_engine(image)
+    ocr_result = run_paddle_ocr(ocr_engine, image)
     tokens = ocr_tokens_from_result(ocr_result)
 
     payload = {

@@ -17,6 +17,7 @@ from datasets.real_flow_test_prep import (
     ocr_tokens_from_result,
     select_statistics_anchor,
 )
+from datasets.paddle_ocr_common import init_paddle_ocr_engine, run_paddle_ocr
 
 
 DEFAULT_PLAIN_DIR = Path(
@@ -27,15 +28,15 @@ DEFAULT_OUTPUT_DIR = DEFAULT_PLAIN_DIR.parent / "station_tables_daily"
 DEFAULT_METADATA_PATH = DEFAULT_PLAIN_DIR.parent / "station_tables_daily_metadata.json"
 
 
-def init_ocr_engine(det_model_path: Path, rec_model_path: Path, max_side_len: int) -> Any:
-    from rapidocr_onnxruntime import RapidOCR
-
-    return RapidOCR(
-        det_model_path=str(det_model_path),
-        rec_model_path=str(rec_model_path),
+def init_ocr_engine(
+    max_side_len: int,
+    ocr_cuda: str,
+    ocr_device_id: int,
+) -> Any:
+    return init_paddle_ocr_engine(
         max_side_len=max_side_len,
-        det_use_cuda=False,
-        rec_use_cuda=False,
+        ocr_cuda=ocr_cuda,
+        ocr_device_id=ocr_device_id,
     )
 
 
@@ -89,7 +90,7 @@ def crop_daily_region(
         if debug_roi_dir is not None:
             debug_roi_dir.mkdir(parents=True, exist_ok=True)
             cv2.imwrite(str(debug_roi_dir / image_path.name), lower_label_region)
-        ocr_result, _ = ocr_engine(lower_label_region)
+        ocr_result = run_paddle_ocr(ocr_engine, lower_label_region)
         tokens = ocr_tokens_from_result(ocr_result, y_offset=roi_top)
         anchor, anchor_method = select_statistics_anchor(tokens)
 
@@ -155,16 +156,20 @@ def main() -> None:
         help="Experimental fallback path. Do not use for the main real-data pipeline unless explicitly approved.",
     )
     parser.add_argument(
-        "--ocr-det-model-path",
-        type=Path,
-        default=Path("./datasets/ONNX_models/ch_PP-OCRv5_det_server.onnx"),
+        "--ocr-max-side-len", type=int, default=10000
     )
     parser.add_argument(
-        "--ocr-rec-model-path",
-        type=Path,
-        default=Path("./datasets/ONNX_models/ch_PP-OCRv5_rec_server.onnx"),
+        "--ocr-cuda",
+        choices=("on", "off", "auto"),
+        default="on",
+        help="RapidOCR Paddle device policy. Default uses GPU 1 via CUDA_VISIBLE_DEVICES remapping.",
     )
-    parser.add_argument("--ocr-max-side-len", type=int, default=10000)
+    parser.add_argument(
+        "--ocr-device-id",
+        type=int,
+        default=1,
+        help="Physical GPU id to expose to Paddle. The script remaps this card to gpu:0 inside the process.",
+    )
     parser.add_argument(
         "--bottom-buffer-px",
         type=int,
@@ -182,9 +187,9 @@ def main() -> None:
     ocr_engine = None
     if not args.disable_ocr:
         ocr_engine = init_ocr_engine(
-            det_model_path=args.ocr_det_model_path,
-            rec_model_path=args.ocr_rec_model_path,
             max_side_len=args.ocr_max_side_len,
+            ocr_cuda=args.ocr_cuda,
+            ocr_device_id=args.ocr_device_id,
         )
 
     records = []

@@ -6,6 +6,7 @@
 !/datasets/build_real_flow_alignment.py
 !/datasets/real_flow_test_prep.py
 !/datasets/run_ocr_on_image.py
+!/datasets/paddle_ocr_common.py
 !/datasets/__init__.py
 /outputs/
 

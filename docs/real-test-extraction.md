@@ -45,7 +45,7 @@ conda create -n rapid python=3.10 -y
 conda activate rapid
 pip install pymupdf opencv-python
 pip install rapid_table_det
-pip install rapidocr_onnxruntime
+pip install rapidocr==3.8.1
 ```
 
 Then verify:
@@ -54,7 +54,7 @@ Then verify:
 conda run -n rapid python -c "import fitz; print('fitz ok')"
 conda run -n rapid python -c "import cv2; print('cv2 ok')"
 conda run -n rapid python -c "from rapid_table_det.inference import TableDetector; print('rapid_table_det ok')"
-conda run -n rapid python -c "from rapidocr_onnxruntime import RapidOCR; print('rapidocr ok')"
+conda run -n rapid python -c "from rapidocr import RapidOCR; print('rapidocr ok')"
 ```
 
 ## Script Location And Code Rules
@@ -178,6 +178,7 @@ The OCR-based daily crop path is now validated for both current source PDFs:
 The current daily-crop behavior is:
 - build a lower-left statistics ROI from the extracted plain crop
 - run OCR only on that ROI, not on the full table image
+- default to `rapidocr` with the Paddle backend, `PP-OCRv5` server models, and physical `GPU 1` exposed as Paddle `gpu:0`
 - choose the upper monthly-statistics anchor from OCR tokens
 - prefer a full `平均` token
 - if full `平均` is missing, allow `平` or `均` as constrained weak anchors only when they appear in the left statistics label column and remain clearly above `年统计`

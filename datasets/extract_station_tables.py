@@ -10,9 +10,9 @@ from typing import Any
 import cv2
 import fitz
 from rapid_table_det.inference import TableDetector
-from rapidocr_onnxruntime import RapidOCR
 from tqdm import tqdm
 
+from datasets.paddle_ocr_common import init_paddle_ocr_engine, run_paddle_ocr
 
 DEFAULT_PDFS = [
     "datasets/流量/2006 流量 6-16 汉江区（汉江下游水系，汈汊湖、东荆河水系）.pdf",
@@ -73,18 +73,6 @@ def parse_args() -> argparse.Namespace:
         help="Fixed number of pixels added below the original table top when extracting the title ROI.",
     )
     parser.add_argument(
-        "--ocr-det-model-path",
-        type=Path,
-        default="./datasets/ONNX_models/ch_PP-OCRv5_det_server.onnx",
-        help="Optional RapidOCR detection ONNX model path.",
-    )
-    parser.add_argument(
-        "--ocr-rec-model-path",
-        type=Path,
-        default="./datasets/ONNX_models/ch_PP-OCRv5_rec_server.onnx",
-        help="Optional RapidOCR recognition ONNX model path.",
-    )
-    parser.add_argument(
         "--ocr-max-side-len",
         type=int,
         default=10000,
@@ -93,8 +81,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--ocr-cuda",
         choices=["auto", "on", "off"],
-        default="auto",
-        help="RapidOCR device policy. 'auto' tries CUDA first and falls back to CPU.",
+        default="on",
+        help="RapidOCR Paddle device policy. Default uses GPU 1 via CUDA_VISIBLE_DEVICES remapping.",
+    )
+    parser.add_argument(
+        "--ocr-device-id",
+        type=int,
+        default=1,
+        help="Physical GPU id to expose to Paddle. The script remaps this card to gpu:0 inside the process.",
     )
     return parser.parse_args()
 
@@ -167,22 +161,12 @@ def sort_detections(detections: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
-def init_ocr_engine(args: argparse.Namespace) -> RapidOCR:
-    kwargs: dict[str, Any] = {"max_side_len": args.ocr_max_side_len}
-    if args.ocr_det_model_path is not None:
-        kwargs["det_model_path"] = str(args.ocr_det_model_path)
-    if args.ocr_rec_model_path is not None:
-        kwargs["rec_model_path"] = str(args.ocr_rec_model_path)
-
-    if args.ocr_cuda == "off":
-        return RapidOCR(det_use_cuda=False, rec_use_cuda=False, **kwargs)
-    if args.ocr_cuda == "on":
-        return RapidOCR(det_use_cuda=True, rec_use_cuda=True, **kwargs)
-
-    try:
-        return RapidOCR(det_use_cuda=True, rec_use_cuda=True, **kwargs)
-    except Exception:
-        return RapidOCR(det_use_cuda=False, rec_use_cuda=False, **kwargs)
+def init_ocr_engine(args: argparse.Namespace) -> Any:
+    return init_paddle_ocr_engine(
+        max_side_len=args.ocr_max_side_len,
+        ocr_cuda=args.ocr_cuda,
+        ocr_device_id=args.ocr_device_id,
+    )
 
 
 def expected_title_keyword(pdf_path: Path) -> str:
@@ -247,10 +231,10 @@ def merge_title_lines(ocr_result: list[Any]) -> tuple[list[str], str]:
 
 def recognize_table_title(
     title_region: Any,
-    ocr_engine: RapidOCR,
+    ocr_engine: Any,
     expected_keyword: str,
 ) -> dict[str, Any]:
-    ocr_result, _ = ocr_engine(title_region)
+    ocr_result = run_paddle_ocr(ocr_engine, title_region)
     ordered_lines, merged_text = merge_title_lines(ocr_result or [])
     keyword_line = next((line for line in ordered_lines if expected_keyword in line), None)
     success = keyword_line is not None
@@ -310,7 +294,7 @@ def crop_tables_from_page(
     buffered_crop_dir: Path,
     title_roi_dir: Path,
     detector: TableDetector,
-    ocr_engine: RapidOCR,
+    ocr_engine: Any,
     pdf_path: Path,
     year: str,
     title_buffer_px: int,
@@ -501,7 +485,7 @@ def process_pdf(
     pdf_path: Path,
     output_root: Path,
     detector: TableDetector,
-    ocr_engine: RapidOCR,
+    ocr_engine: Any,
     dpi: int,
     limit_pages: int | None,
     skip_rendered_pages: bool,

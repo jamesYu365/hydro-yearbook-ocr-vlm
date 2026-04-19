@@ -92,7 +92,7 @@ Install the extraction stack in `rapid`:
 conda activate rapid
 pip install pymupdf opencv-python
 pip install rapid_table_det
-pip install rapidocr_onnxruntime
+pip install rapidocr==3.8.1
 ```
 
 Verify the extraction environment:
@@ -101,7 +101,7 @@ Verify the extraction environment:
 conda run -n rapid python -c "import fitz; print('fitz ok')"
 conda run -n rapid python -c "import cv2; print('cv2 ok')"
 conda run -n rapid python -c "from rapid_table_det.inference import TableDetector; print('rapid_table_det ok')"
-conda run -n rapid python -c "from rapidocr_onnxruntime import RapidOCR; print('rapidocr ok')"
+conda run -n rapid python -c "from rapidocr import RapidOCR; print('rapidocr ok')"
 ```
 
 ## Attention Backend
