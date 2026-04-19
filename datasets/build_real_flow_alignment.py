@@ -19,7 +19,7 @@ from scripts.common.yearbook_flow_common import read_csv_text
 
 DEFAULT_IMAGE_DIR = Path(
     "datasets/derived/final_test_layout/"
-    "2006_流量_6-16_汉江区(汉江下游水系,汈汊湖、东荆河水系)/station_tables_daily"
+    "2006_流量_6-16_汉江区/station_tables_daily"
 )
 
 

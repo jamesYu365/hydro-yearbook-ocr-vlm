@@ -22,7 +22,7 @@ from datasets.paddle_ocr_common import init_paddle_ocr_engine, run_paddle_ocr
 
 DEFAULT_PLAIN_DIR = Path(
     "datasets/derived/final_test_layout/"
-    "2006_流量_6-16_汉江区(汉江下游水系,汈汊湖、东荆河水系)/station_tables_plain"
+    "2006_流量_6-16_汉江区/station_tables_plain"
 )
 DEFAULT_OUTPUT_DIR = DEFAULT_PLAIN_DIR.parent / "station_tables_daily"
 DEFAULT_METADATA_PATH = DEFAULT_PLAIN_DIR.parent / "station_tables_daily_metadata.json"
