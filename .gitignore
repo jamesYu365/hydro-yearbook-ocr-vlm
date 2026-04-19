@@ -5,6 +5,7 @@
 !/datasets/crop_flow_table_daily_region.py
 !/datasets/build_real_flow_alignment.py
 !/datasets/real_flow_test_prep.py
+!/datasets/run_ocr_on_image.py
 !/datasets/__init__.py
 /outputs/
 
