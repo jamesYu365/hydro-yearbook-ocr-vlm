@@ -6,7 +6,7 @@
 
 ## 项目概览
 
-本项目聚焦水文年鉴流量表 OCR。当前 v0 范围刻意收窄，只做一个固定版式、一个模型方向、一个输出契约。
+本项目聚焦水文年鉴流量表 OCR。当前 v0 的训练与评测范围刻意收窄，只做一个固定流量表版式、一个模型方向、一个输出契约。
 
 v0 任务固定为：
 - 单表图像 -> 原样 CSV 文本
@@ -21,7 +21,7 @@ v0 任务固定为：
 
 当前 v0 已固定的方案：
 - 只做 `流量`
-- 暂不做 `水位`
+- `水位` 不进入 v0 的训练和最终评测范围
 - 只做一种固定流量表版式
 - 合成表格程序绘制，不复用真实截图
 - 保留自然日历空位和少量缺测值
@@ -38,6 +38,8 @@ v0 任务固定为：
 - 真实流量测试 manifest 构建已实现并通过 smoke test
 - 真实 `2006 流量` 表的 OCR 日值裁切已实现
 - 已实现从真实日值裁切图到校准 CSV 的打分对齐
+- 真实 `2014 水位` 表的 OCR 日值裁切也已实现
+- 真实数据裁切主路径当前采用“左下统计区 ROI + `平均` 优先、`平/均` 受限弱锚点”的规则
 - 面向 `GOT-OCR2.0` 的 `ms-swift` manifest 转换已实现并通过 smoke test
 - 严格 CSV 评测脚本已实现，并有测试覆盖
 - Linux 环境安装脚本已提供
@@ -68,8 +70,9 @@ v0 任务固定为：
 
 数据说明：
 - `datasets/流量/` 是当前 v0 主目标数据
-- `datasets/水位/` 已存在，但不在 v0 范围内
+- `datasets/水位/` 已存在，并已完成真实表格抽取与日值裁切，但暂不进入 v0 模型基准
 - `datasets/derived/` 下的 `station_tables_daily/` 是当前 `2006 流量` 正式真实测试图像集
+- 同样的 `station_tables_daily/` 产物也已生成到 `2014 水位`
 - 部分 CSV 使用本地中文编码而非 UTF-8
 - 文件名中编码了站点、年份和河流信息，应保持不变
 
@@ -107,6 +110,7 @@ v0 任务固定为：
 ```bash
 python3 ./scripts/data/build_real_test_manifest.py
 conda run -n rapid python ./datasets/crop_flow_table_daily_region.py
+conda run -n rapid python ./datasets/run_ocr_on_image.py 'datasets/derived/debug_rois/2014_水位/page_0004_table1_汉江汉川站_2014.jpg' --ocr-cuda off
 python3 ./datasets/build_real_flow_alignment.py
 python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl

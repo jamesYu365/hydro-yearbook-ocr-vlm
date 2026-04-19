@@ -51,6 +51,7 @@ The current aligned real test manifest stores:
 `source` is `real` and `split` is always `test`.
 
 The current official real-test image set for `2006 流量` is `station_tables_daily/`, which is produced by the OCR-based daily-only crop path.
+The same OCR-based daily-only crop path is also validated for `2014 水位`, but no aligned manifest exists for it yet because calibrated CSV labels are not present in the repository.
 
 The current aligned manifest is produced by:
 - `datasets/crop_flow_table_daily_region.py`

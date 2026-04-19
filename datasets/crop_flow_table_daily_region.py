@@ -11,6 +11,7 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from datasets.real_flow_test_prep import (
+    apply_bottom_buffer,
     fallback_cut_y_from_lines,
     find_horizontal_cut_y,
     ocr_tokens_from_result,
@@ -63,6 +64,8 @@ def crop_daily_region(
     image_path: Path,
     output_dir: Path,
     ocr_engine: Any | None,
+    bottom_buffer_px: int,
+    debug_roi_dir: Path | None = None,
 ) -> dict[str, Any]:
     import cv2
 
@@ -74,18 +77,7 @@ def crop_daily_region(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / image_path.name
     if output_path.exists():
-        return {
-            "source_image_path": image_path.as_posix(),
-            "output_image_path": output_path.as_posix(),
-            "image_height": height,
-            "image_width": width,
-            "cut_y": None,
-            "cut_method": "skipped_existing",
-            "anchor_method": None,
-            "anchor_text": None,
-            "anchor_top": None,
-            "detected_tokens": [],
-        }
+        output_path.unlink()
 
     tokens = []
     anchor = None
@@ -94,6 +86,9 @@ def crop_daily_region(
         roi_top = int(height * 0.68)
         roi_right = max(int(width * 0.22), 180)
         lower_label_region = image[roi_top:, :roi_right]
+        if debug_roi_dir is not None:
+            debug_roi_dir.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(debug_roi_dir / image_path.name), lower_label_region)
         ocr_result, _ = ocr_engine(lower_label_region)
         tokens = ocr_tokens_from_result(ocr_result, y_offset=roi_top)
         anchor, anchor_method = select_statistics_anchor(tokens)
@@ -111,11 +106,13 @@ def crop_daily_region(
             cut_y = max(int(anchor.top) - 6, 1)
             cut_method = f"{anchor_method}_direct"
 
-    if cut_y is None:
+    if cut_y is None and ocr_engine is None:
         cut_y, cut_method = multi_threshold_line_cut(row_dark_counts, width, height)
 
     if cut_y is None:
-        raise RuntimeError(f"Unable to determine cut boundary for {image_path.name}")
+        raise RuntimeError(f"Unable to determine cut boundary for {image_path.name}: no_valid_average_anchor")
+
+    cut_y = apply_bottom_buffer(cut_y, height, bottom_buffer_px=bottom_buffer_px)
 
     cropped = image[:cut_y, :]
     cv2.imwrite(str(output_path), cropped)
@@ -168,6 +165,18 @@ def main() -> None:
         default=Path("./datasets/ONNX_models/ch_PP-OCRv5_rec_server.onnx"),
     )
     parser.add_argument("--ocr-max-side-len", type=int, default=10000)
+    parser.add_argument(
+        "--bottom-buffer-px",
+        type=int,
+        default=6,
+        help="Extend the crop a few pixels below the detected divider to avoid clipping the 31st row.",
+    )
+    parser.add_argument(
+        "--debug-roi-dir",
+        type=Path,
+        default=None,
+        help="Optional directory for saving the OCR ROI images used to detect statistics anchors.",
+    )
     args = parser.parse_args()
 
     ocr_engine = None
@@ -191,6 +200,8 @@ def main() -> None:
                     image_path=image_path,
                     output_dir=args.output_dir,
                     ocr_engine=ocr_engine,
+                    bottom_buffer_px=args.bottom_buffer_px,
+                    debug_roi_dir=args.debug_roi_dir,
                 )
             )
         except Exception as exc:

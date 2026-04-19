@@ -18,9 +18,10 @@ The current extraction step does not:
 - split a station table into header/day/month/year sub-images
 - build the final inference manifest automatically
 
-The repository now also includes two follow-up scripts for `2006 流量`:
-- `datasets/crop_flow_table_daily_region.py`: crop existing `station_tables_plain/` images down to the daily-only region by anchoring on the upper `平均`, writing to `station_tables_daily/`
+The repository now also includes follow-up scripts for the extracted station-table crops:
+- `datasets/crop_flow_table_daily_region.py`: crop existing `station_tables_plain/` images down to the daily-only region by scanning a lower-left statistics ROI, then anchoring on full `平均` or constrained `平/均` weak anchors, writing to `station_tables_daily/`
 - `datasets/build_real_flow_alignment.py`: score and align calibrated CSV labels to OCR-cropped JPG files and emit a real-test manifest plus an audit report
+- `datasets/run_ocr_on_image.py`: run RapidOCR on any single debug image or ROI and print token-level OCR output
 
 ## Current Target PDFs
 
@@ -157,12 +158,35 @@ Title OCR success is stricter than layout success:
 ## Next Step
 
 After extraction, the next dataset task is:
-- align cropped station-table images with the calibrated CSV labels
+- align cropped station-table images with the calibrated CSV labels when those labels exist
 - build the real final-test inference manifest from those aligned pairs
 
 Current helper commands for that step:
 
 ```bash
 conda run -n rapid python datasets/crop_flow_table_daily_region.py
+conda run -n rapid python datasets/run_ocr_on_image.py 'datasets/derived/debug_rois/2014_水位/page_0004_table1_汉江汉川站_2014.jpg' --ocr-cuda off
 python3 datasets/build_real_flow_alignment.py
 ```
+
+## Daily Crop Notes
+
+The OCR-based daily crop path is now validated for both current source PDFs:
+- `2006 流量`
+- `2014 水位`
+
+The current daily-crop behavior is:
+- build a lower-left statistics ROI from the extracted plain crop
+- run OCR only on that ROI, not on the full table image
+- choose the upper monthly-statistics anchor from OCR tokens
+- prefer a full `平均` token
+- if full `平均` is missing, allow `平` or `均` as constrained weak anchors only when they appear in the left statistics label column and remain clearly above `年统计`
+- never use `年统计` itself as the formal crop anchor
+- add a small bottom buffer so the `31` row is not clipped
+
+The current validated `2014 水位` result is:
+- `47` input tables
+- `47` daily crops
+- `0` failures
+- `28` crops with `average_anchor`
+- `19` crops with `weak_average_anchor`

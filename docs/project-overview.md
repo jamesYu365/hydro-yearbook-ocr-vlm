@@ -57,11 +57,18 @@ The current verified status as of 2026-04-17 additionally includes:
 - the current aligned `2006 流量` audit reports `35` CSV files, `35` images, and `35` confirmed matches
 - real-data preprocessing, extraction, alignment, and crop-generation code now lives under `datasets/`
 
+The current verified status as of 2026-04-19 additionally includes:
+- `2014 水位` daily-only OCR crops have been regenerated successfully with `47` input tables, `47` cropped outputs, and `0` failures
+- the `2014 水位` crop path now uses the same lower-left statistics ROI as `2006 流量`
+- anchor selection now prefers full `平均`, then falls back to constrained `平/均` weak anchors inside the statistics label column
+- `2014 水位` metadata currently reports `28` `average_anchor` crops and `19` `weak_average_anchor` crops
+- `year_stats_anchor` is no longer used in the formal real-data crop path
+
 ## v0 Scope
 
 The current v0 direction is intentionally narrow:
 - focus on `流量` only
-- do not handle `水位` in v0
+- keep `水位` out of the v0 training and final evaluation scope
 - use one fixed flow-table layout
 - use synthetic data for train and validation
 - use real calibrated flow tables for final test only
@@ -72,6 +79,9 @@ The current v0 direction is intentionally narrow:
 The main remaining execution gaps are:
 - launch the first full baseline training run and collect the first durable checkpoints
 - run final inference and strict evaluation on real extracted table images
+
+The main remaining real-data gap outside the v0 benchmark is:
+- `2014 水位` still lacks calibrated CSV labels in the repository, so no alignment manifest or strict evaluation has been built for it yet
 
 ## Current Recommended Training Route
 

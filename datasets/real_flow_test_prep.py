@@ -298,10 +298,42 @@ def select_statistics_anchor(tokens: list[OcrToken]) -> tuple[OcrToken | None, s
         (token for token in tokens if "平均" in token.text),
         key=lambda token: token.top,
     )
+    weak_average_tokens = sorted(
+        (token for token in tokens if token.text in {"平", "均"}),
+        key=lambda token: token.top,
+    )
     year_stats = sorted(
         (token for token in tokens if "年统计" in token.text),
         key=lambda token: token.top,
     )
+    statistic_labels = sorted(
+        (
+            token
+            for token in tokens
+            if any(label in token.text for label in ("日期", "最低", "最高", "年统计"))
+        ),
+        key=lambda token: token.top,
+    )
+
+    def is_above_year_stats(token: OcrToken) -> bool:
+        if not year_stats:
+            return True
+        return token.center_y < year_stats[0].center_y - 24.0
+
+    def label_column_right_bound() -> float:
+        candidates = [token.right for token in statistic_labels]
+        if average_tokens:
+            candidates.extend(token.right for token in average_tokens)
+        if year_stats:
+            candidates.extend(token.right for token in year_stats)
+        return max(candidates, default=160.0) + 12.0
+
+    def has_statistics_context(token: OcrToken) -> bool:
+        return any(
+            12.0 <= other.center_y - token.center_y <= 120.0
+            for other in statistic_labels
+            if other.top > token.top
+        )
 
     if len(average_tokens) >= 2:
         if year_stats:
@@ -321,13 +353,26 @@ def select_statistics_anchor(tokens: list[OcrToken]) -> tuple[OcrToken | None, s
         if average_tokens[0].center_y < year_stats[0].center_y - 24.0:
             return average_tokens[0], "average_anchor"
 
-    if year_stats:
-        return year_stats[0], "year_stats_anchor"
-
     if average_tokens:
         return average_tokens[0], "average_anchor_fallback"
 
+    weak_label_bound = label_column_right_bound()
+    weak_candidates = [
+        token
+        for token in weak_average_tokens
+        if token.right <= weak_label_bound
+        and token.left <= weak_label_bound - 24.0
+        and is_above_year_stats(token)
+        and has_statistics_context(token)
+    ]
+    if weak_candidates:
+        return weak_candidates[0], "weak_average_anchor"
+
     return None, None
+
+
+def apply_bottom_buffer(cut_y: int, height: int, bottom_buffer_px: int = 6) -> int:
+    return min(max(cut_y + bottom_buffer_px, 1), height)
 
 
 def find_horizontal_cut_y(
