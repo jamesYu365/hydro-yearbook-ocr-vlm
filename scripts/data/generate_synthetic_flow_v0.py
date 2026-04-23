@@ -13,6 +13,7 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scripts.common.yearbook_flow_common import (
+    csv_rows_to_got_format,
     csv_rows_to_text,
     dump_json,
     is_blank_row,
@@ -249,6 +250,7 @@ def main() -> None:
     for index in range(args.num_samples):
         sample_rows = sample_table_rows(template_rows, pools, rng)
         sample_csv = csv_rows_to_text(sample_rows)
+        sample_got_format = csv_rows_to_got_format(sample_rows)
         image, cells = render_table(sample_rows, font_path, rng)
         image, perturbations = apply_perturbations(image, rng)
 
@@ -280,6 +282,7 @@ def main() -> None:
             "sample_id": sample_id,
             "image_path": str(image_path.as_posix()),
             "target_csv": sample_csv,
+            "target_got_format": sample_got_format,
             "layout_json_path": str(layout_path.as_posix()),
             "perturbations": perturbations,
             "source_template_id": "fixed_flow_table",

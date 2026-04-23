@@ -14,7 +14,7 @@ from datasets.real_flow_test_prep import (
     parse_image_entry,
     resolve_reciprocal_matches,
 )
-from scripts.common.yearbook_flow_common import read_csv_text
+from scripts.common.yearbook_flow_common import csv_rows_to_got_format, parse_csv_text, read_csv_text
 
 
 DEFAULT_IMAGE_DIR = Path(
@@ -37,6 +37,7 @@ def build_alignment_manifest(
     with output_path.open("w", encoding="utf-8") as handle:
         for row in rows:
             csv_text, csv_encoding = read_csv_text(Path(row["csv_path"]))
+            csv_rows = parse_csv_text(csv_text)
             payload = {
                 "sample_id": row["sample_id"],
                 "station_name": row["station_name_csv"],
@@ -47,6 +48,7 @@ def build_alignment_manifest(
                 "image_path": row["image_path"],
                 "title_text": row["image_title_text"],
                 "target_csv": csv_text,
+                "target_got_format": csv_rows_to_got_format(csv_rows),
                 "match_score": row["match_score"],
                 "match_status": row["match_status"],
                 "split": "test",

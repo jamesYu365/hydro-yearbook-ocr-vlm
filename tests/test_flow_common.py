@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from scripts.common.yearbook_flow_common import (
+    csv_rows_to_got_format,
     month_day_limit,
     parse_station_meta,
     sample_id_from_name,
@@ -22,3 +23,17 @@ def test_month_day_limit() -> None:
 
 def test_sample_id_is_stable() -> None:
     assert sample_id_from_name("flow_v0_00001") == sample_id_from_name("flow_v0_00001")
+
+
+def test_csv_rows_to_got_format() -> None:
+    rows = [
+        ["日期", "一月", "二月"],
+        ["1", "29.5", "19"],
+        ["2", "", "19.2"],
+    ]
+    text = csv_rows_to_got_format(rows)
+    assert text.startswith("\\begin{tabular}{|c|c|c|}\n\\hline\n")
+    assert "日期 & 一月 & 二月 \\\\" in text
+    assert "1 & 29.5 & 19 \\\\" in text
+    assert "2 &  & 19.2 \\\\" in text
+    assert text.endswith("\\end{tabular}\n")

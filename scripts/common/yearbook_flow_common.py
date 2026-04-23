@@ -17,6 +17,7 @@ DEFAULT_PROMPT = (
     "Do not normalize number formats.\n"
     "Do not fill in missing values."
 )
+DEFAULT_GOT_FORMAT_PROMPT = "OCR with format: "
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,21 @@ def csv_rows_to_text(rows: Iterable[Iterable[str]]) -> str:
     lines = []
     for row in rows:
         lines.append(",".join(str(cell) for cell in row))
+    return "\n".join(lines) + "\n"
+
+
+def csv_rows_to_got_format(rows: Iterable[Iterable[str]]) -> str:
+    normalized_rows = [list(row) for row in rows]
+    if not normalized_rows:
+        return ""
+    column_count = max(len(row) for row in normalized_rows)
+    spec = "|" + "|".join("c" for _ in range(column_count)) + "|"
+    lines = [f"\\begin{{tabular}}{{{spec}}}", "\\hline"]
+    for row in normalized_rows:
+        padded = row + [""] * (column_count - len(row))
+        lines.append(" & ".join(str(cell) for cell in padded) + " \\\\")
+        lines.append("\\hline")
+    lines.append("\\end{tabular}")
     return "\n".join(lines) + "\n"
 
 
@@ -101,4 +117,3 @@ def dump_json(path: Path, payload: object) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-
