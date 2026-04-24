@@ -4,9 +4,9 @@
 
 This document defines the v0 data contract for the fixed-layout flow-table benchmark.
 
-The v0 task contract is:
-- input: single table image
-- output: raw CSV text
+The repository currently tracks two related output contracts:
+- label contract: calibrated CSV remains the source-of-truth representation
+- current GOT baseline contract: official GOT formatted table text
 
 ## Synthetic Dataset
 
@@ -21,6 +21,7 @@ Each synthetic manifest row must include:
 - `sample_id`
 - `image_path`
 - `target_csv`
+- `target_got_format`
 - `layout_json_path`
 - `perturbations`
 - `source_template_id`
@@ -43,6 +44,7 @@ The current aligned real test manifest stores:
 - `image_path`
 - `title_text`
 - `target_csv`
+- `target_got_format`
 - `match_score`
 - `match_status`
 - `split`
@@ -57,13 +59,16 @@ The current aligned manifest is produced by:
 - `datasets/crop_flow_table_daily_region.py`
 - `datasets/build_real_flow_alignment.py`
 
-## CSV Rules
+## Output Rules
 
-- The target is raw CSV text, not Markdown.
-- Empty rows are preserved.
-- Empty cells are preserved.
+- `target_csv` preserves the calibrated table label exactly.
+- `target_got_format` is deterministically derived from `target_csv`.
+- Empty rows and empty cells are preserved when deriving either representation.
 - Number formats are preserved exactly as generated or labeled.
-- Evaluation uses raw model output without normalization, repair, or structure fixing.
+- The current `ms-swift` GOT training path defaults to:
+  - prompt: `OCR with format: `
+  - response field: `target_got_format`
+- Strict CSV evaluation remains available, but it should only be treated as a like-for-like metric when the prediction target is also CSV.
 
 ## Layout JSON
 

@@ -8,14 +8,16 @@
 
 本项目聚焦水文年鉴流量表 OCR。当前 v0 的训练与评测范围刻意收窄，只做一个固定流量表版式、一个模型方向、一个输出契约。
 
-v0 任务固定为：
-- 单表图像 -> 原样 CSV 文本
+当前仓库同时维护两层任务表示：
+- 标签权威层：人工校准 CSV 仍然是 source-of-truth
+- 当前 GOT 基线目标：单表图像 -> 官方 GOT 格式化表格文本
 
 当前基线方向为：
 - 模型：`GOT-OCR2.0`
 - 训练：以高保真合成数据为主
 - 最终测试：只在真实已校准流量表上做
-- 评测：直接基于模型原始输出，不做后处理
+- 训练目标：官方 `OCR with format:` 输出
+- 评测：优先比较官方格式目标，同时保留严格 CSV 评测作为兼容指标
 
 ## 当前范围
 
@@ -30,7 +32,7 @@ v0 任务固定为：
 
 ## 当前状态
 
-截至 2026-04-17，仓库当前状态如下：
+截至 2026-04-24，仓库当前状态如下：
 - 原始 PDF 和人工校准 CSV 位于 `datasets/`
 - 已将校准 CSV 作为 source-of-truth 标签
 - `docs/` 下的主文档已补齐
@@ -41,16 +43,19 @@ v0 任务固定为：
 - 真实 `2014 水位` 表的 OCR 日值裁切也已实现
 - 真实数据裁切主路径当前采用“左下统计区 ROI + `平均` 优先、`平/均` 受限弱锚点”的规则
 - 面向 `GOT-OCR2.0` 的 `ms-swift` manifest 转换已实现并通过 smoke test
+- 已建立共享核心包 `src/yearbook_ocr/`，承载稳定的数据、OCR、推理与评测逻辑
+- GOT 推理入口已统一到 `scripts/models/got_ocr2/run_inference.py`
 - 严格 CSV 评测脚本已实现，并有测试覆盖
 - Linux 环境安装脚本已提供
 - `swift sft` 训练包装脚本已提供，并已完成 smoke run 验证
 - `data/` 下已有小规模样本与 manifest 预览产物
-- `conda run -n got pytest -q` 当前结果为 `6 passed`
+- `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_strict_csv.py` 当前结果为 `21 passed`
 - 一次基于 `sdpa` 的 GOT-OCR2.0 LoRA smoke training 已经跑通
+- 单卡基线训练已经产出可复用 checkpoint，位于 `outputs/got_ocr2_v0_single/`
 
 当前仍未完成：
-- 启动第一轮完整的多卡 `GOT-OCR2.0` LoRA 微调
-- 在真实裁切表格图像上完成最终推理与严格评测
+- 在当前机器上收敛一条稳定的多卡 `GOT-OCR2.0` LoRA 训练路径
+- 产出一份正式的真实流量测试对比报告，比较 base GOT 与微调 GOT
 
 ## 当前稳定路径
 
@@ -82,14 +87,13 @@ v0 任务固定为：
 .
 ├── configs/                  # 实验配置
 ├── data/                     # 已生成的样本与 manifest
-├── datasets/                 # 原始 PDF 与已校准 CSV 标签
+├── datasets/                 # 原始 PDF、已校准 CSV 标签，以及真实数据薄入口
 ├── docs/                     # 项目说明与细化规范
 ├── references/               # 外部参考代码和论文
-├── datasets/*.py             # 真实数据抽取、裁切与对齐脚本
-├── scripts/common/           # 流量表公共工具
-├── scripts/data/             # 数据处理与合成数据生成
-├── scripts/eval/             # 评测
-├── scripts/models/           # 模型相关训练适配
+├── src/yearbook_ocr/         # 共享核心包：数据、OCR、GOT 推理、评测
+├── scripts/data/             # 合成数据入口
+├── scripts/eval/             # 评测薄包装
+├── scripts/models/           # 模型相关薄包装
 ├── tests/                    # 自动化测试
 ├── AGENTS.md                 # 极简协作入口
 ├── README.md                 # 英文首页
@@ -114,7 +118,7 @@ python3 ./datasets/build_real_flow_alignment.py
 python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl
-python3 ./scripts/models/got_ocr2/run_inference.py --manifest data/manifests/flow_real_test_aligned.jsonl --limit 5
+python3 ./scripts/models/got_ocr2/run_inference.py --manifest data/manifests/flow_real_test_aligned.jsonl --limit 5 --backend official_chat --query-mode official_format
 python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/got_ocr2_v0.jsonl --output outputs/reports/got_ocr2_v0_eval.json
 ```
 

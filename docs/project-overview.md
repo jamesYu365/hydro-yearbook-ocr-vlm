@@ -8,7 +8,7 @@ The immediate v0 objective is:
 - fine-tune `GOT-OCR2.0`
 - train mainly on high-fidelity synthetic flow tables
 - evaluate on real calibrated flow tables
-- score raw model output as CSV with no post-processing
+- keep calibrated CSV as label authority while the current GOT training target follows the official `OCR with format:` output style
 
 ## Current Repository State
 
@@ -17,11 +17,11 @@ The repository is no longer documentation-only. The current implemented pieces a
 - real-test PDF page rendering and layout-based station-table extraction under `datasets/`
 - OCR-based daily-only crop generation for real `2006 流量` tables under `datasets/`
 - scored alignment from extracted daily crops to calibrated `2006 流量` CSV labels under `datasets/`
-- shared flow-table utilities under `scripts/common/`
+- a shared core package under `src/yearbook_ocr/`
 - synthetic flow-table generation under `scripts/data/`
-- real test manifest generation under `scripts/data/`
 - `ms-swift` manifest conversion for `GOT-OCR2.0` under `scripts/models/got_ocr2/`
-- strict CSV evaluation under `scripts/eval/`
+- unified GOT inference through `scripts/models/got_ocr2/run_inference.py`
+- CSV-oriented evaluation through `scripts/eval/`
 - a Linux environment setup script under `scripts/`
 - basic tests under `tests/`
 - a validated `swift sft` wrapper under `scripts/models/got_ocr2/`
@@ -33,13 +33,14 @@ Existing generated artifacts under `data/` already include:
 - a real test manifest
 - a `ms-swift` manifest preview
 
-The current verified status as of 2026-04-08 is:
-- `conda run -n got pytest -q` passes with `6 passed`
+The current verified status as of 2026-04-24 is:
+- `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_strict_csv.py` passes with `21 passed`
 - synthetic data generation smoke test has passed
 - real test manifest generation has passed with 35 records
 - `train_swift.jsonl` and `val_swift.jsonl` have been built successfully
 - a GOT-OCR2.0 LoRA smoke training run has succeeded with `sdpa`
 - single-GPU training is the currently verified stable baseline route on this machine
+- a reusable single-GPU checkpoint set exists under `outputs/got_ocr2_v0_single/`
 
 The current verified status as of 2026-04-13 additionally includes:
 - real-test PDF extraction ran successfully in the `rapid` environment
@@ -55,7 +56,7 @@ The current verified status as of 2026-04-17 additionally includes:
 - `station_tables_daily/` is the official OCR-cropped real-test image set for `2006 流量`
 - the default real-data alignment path now uses `datasets/build_real_flow_alignment.py`
 - the current aligned `2006 流量` audit reports `35` CSV files, `35` images, and `35` confirmed matches
-- real-data preprocessing, extraction, alignment, and crop-generation code now lives under `datasets/`
+- real-data entrypoints remain under `datasets/`, while shared implementation now lives under `src/yearbook_ocr/`
 
 The current verified status as of 2026-04-19 additionally includes:
 - `2014 水位` daily-only OCR crops have been regenerated successfully with `47` input tables, `47` cropped outputs, and `0` failures
@@ -72,13 +73,13 @@ The current v0 direction is intentionally narrow:
 - use one fixed flow-table layout
 - use synthetic data for train and validation
 - use real calibrated flow tables for final test only
-- keep the task fixed as single table image to raw CSV text
+- keep calibrated CSV as label authority, while the current GOT baseline is trained against official GOT formatted table text
 
 ## Current Gaps
 
 The main remaining execution gaps are:
-- launch the first full baseline training run and collect the first durable checkpoints
-- run final inference and strict evaluation on real extracted table images
+- run a formal base-vs-fine-tuned comparison on the real extracted flow tables
+- decide whether to keep the official GOT-format target as the primary benchmark target or reintroduce a first-class CSV benchmark
 
 The main remaining real-data gap outside the v0 benchmark is:
 - `2014 水位` still lacks calibrated CSV labels in the repository, so no alignment manifest or strict evaluation has been built for it yet
@@ -93,6 +94,7 @@ The current stable route is:
 - launch through `scripts/models/got_ocr2/run_swift_sft.sh`
 - use single-GPU training as the official baseline route on this machine
 - only treat multi-GPU as experimental for now
+- use `scripts/models/got_ocr2/run_inference.py` as the only formal GOT inference entrypoint
 
 Important environment findings from the verified smoke run:
 - `bitsandbytes==0.41.0` blocked `swift` startup through `peft`
@@ -112,11 +114,11 @@ Important environment findings from the verified smoke run:
 ## Code Organization
 
 The current code roles are:
-- `datasets/`: source data plus real-test extraction, OCR crop, alignment utilities, and derived extraction outputs
-- `scripts/data/`: synthetic generation and real test manifest building
-- `scripts/models/`: model-specific adapters and training wrappers
-- `scripts/eval/`: strict evaluation
-- `scripts/common/`: shared parsing, encoding, and prompt utilities
+- `datasets/`: source data, derived assets, and thin real-data entrypoints
+- `src/yearbook_ocr/`: shared implementation for data, OCR, GOT inference, and evaluation
+- `scripts/data/`: synthetic generation entrypoints
+- `scripts/models/`: thin model-specific adapters and wrappers
+- `scripts/eval/`: thin evaluation wrappers
 - `configs/`: experiment configuration
 - `tests/`: utility and metric tests
 

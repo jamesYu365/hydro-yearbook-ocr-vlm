@@ -6,13 +6,14 @@ Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evalu
 
 ## Fixed Decisions
 
-- task: single table image to CSV
+- task: single table image to official GOT formatted table text
 - domain: flow tables only
 - layout scope: one fixed flow-table layout
 - training source: synthetic only
 - validation source: synthetic holdout
 - test source: real flow tables only
-- model output: raw CSV with no post-processing
+- label authority: calibrated CSV
+- model output for the current baseline: official GOT formatted table text
 - preferred training path: `ms-swift + LoRA`
 
 ## Deliverables
@@ -21,7 +22,7 @@ Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evalu
 - a real test manifest
 - a real table-image extraction step for final inference
 - a `ms-swift` training manifest and wrapper for `GOT-OCR2.0`
-- a strict evaluation report
+- a formal evaluation report aligned with the chosen target format
 - a per-station score table
 - representative failure cases
 
@@ -35,14 +36,9 @@ Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evalu
 
 ## Metrics
 
-- weighted score: 30% character accuracy + 70% cell accuracy
-- reference metrics:
-  - character accuracy
-  - cell accuracy
-- error tags:
-  - truncation
-  - structure_error
-  - value_error
+- primary metrics should match the active target format
+- strict CSV metrics remain available when predictions are also CSV
+- if the benchmark target stays on official GOT format, the report must make that explicit instead of silently reusing CSV metrics
 
 ## Current Execution Order
 

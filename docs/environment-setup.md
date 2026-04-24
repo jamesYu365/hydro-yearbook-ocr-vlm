@@ -6,7 +6,8 @@ Prepare a Linux `got` conda environment that can run:
 - synthetic data generation
 - GOT-OCR2.0 data conversion
 - `ms-swift` LoRA fine-tuning
-- strict CSV evaluation
+- GOT inference and report generation
+- strict CSV evaluation when needed
 
 Prepare a separate Linux `rapid` conda environment that can run:
 - real PDF page rendering
@@ -129,8 +130,8 @@ pytest -q
 ```
 
 Current verified result on this project:
-- `conda run -n got pytest -q`
-- output: `6 passed`
+- `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_strict_csv.py`
+- output: `21 passed`
 
 ## Chinese Fonts
 
@@ -158,6 +159,7 @@ python ./scripts/data/generate_synthetic_flow_v0.py --num-samples 100
 python ./datasets/build_real_flow_alignment.py
 python ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl
+python ./scripts/models/got_ocr2/run_inference.py --manifest data/manifests/flow_real_test_aligned.jsonl --limit 1 --backend official_chat --query-mode official_format
 ```
 
 Then run:
@@ -189,7 +191,7 @@ outputs/cache/
 - Install everything inside the `got` environment.
 - Use the `rapid` environment for real-test PDF rendering and layout extraction.
 - Keep reference code under `references/`.
-- Keep project adapters and automation in this repository.
+- Keep shared project logic under `src/yearbook_ocr/` and use `datasets/` / `scripts/` as thin entrypoints.
 - Ensure the synthetic renderer is using a Chinese-capable font before generating the final dataset.
 - Real test extraction code lives under `datasets/`, and its outputs should stay under `datasets/derived/`.
 - Title OCR for extracted tables runs only on a dedicated title ROI built from the added top buffer strip plus a small downward compensation below the original table top.

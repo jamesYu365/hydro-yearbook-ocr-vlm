@@ -32,7 +32,7 @@ Then verify the result against the current stable path documented in [environmen
 ## Current Verified Status
 
 The current verified training state as of 2026-04-08 is:
-- tests pass in `got` with `6 passed`
+- tests pass in `got` with `21 passed` on the current focused suite
 - synthetic data smoke generation has passed
 - real test manifest generation has passed with 35 records
 - `train_swift.jsonl` and `val_swift.jsonl` have been built successfully
@@ -63,8 +63,14 @@ python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests
 The manifest format is:
 
 ```json
-{"query":"<image>Read the table and output only CSV text....","response":"...", "images":["...png"]}
+{"query":"<image>OCR with format: ","response":"...", "images":["...png"]}
 ```
+
+The current default manifest conversion path uses:
+- `query`: official GOT format prompt
+- `response`: `target_got_format`
+
+The calibrated CSV label is still retained alongside the manifest source rows as `target_csv`.
 
 ## Training Procedure
 
@@ -78,7 +84,7 @@ Suggested v0 defaults:
 - model: `stepfun-ai/GOT-OCR2_0`
 - method: LoRA
 - attention backend: `sdpa`
-- task: single table image to raw CSV
+- task: single table image to official GOT formatted table text
 - train source: synthetic only
 - val source: synthetic holdout
 - test source: real flow tables only

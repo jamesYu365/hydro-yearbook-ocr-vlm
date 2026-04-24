@@ -8,14 +8,16 @@ A repository for fine-tuning and evaluating vision-language models on hydrologic
 
 This project targets OCR on hydrological yearbook flow tables. The current v0 training and evaluation scope is intentionally narrow: one fixed flow-table layout, one model family, one task contract.
 
-The v0 task is:
-- single table image -> raw CSV text
+The current repository tracks two related task views:
+- label authority: calibrated CSV remains the source-of-truth representation
+- current GOT baseline target: single table image -> official GOT formatted table text
 
 The current baseline direction is:
 - model: `GOT-OCR2.0`
 - training: synthetic data first
 - final test: real calibrated flow tables only
-- evaluation: strict raw-output scoring with no post-processing
+- training target: official GOT `OCR with format:` output
+- evaluation: compare official-format predictions first; keep strict CSV scoring as a separate legacy-compatible metric
 
 ## Current Scope
 
@@ -30,7 +32,7 @@ Current v0 decisions:
 
 ## Current Status
 
-Repository status as of 2026-04-17:
+Repository status as of 2026-04-24:
 - source PDFs and calibrated CSV labels are stored under `datasets/`
 - calibrated CSV files are treated as source-of-truth labels
 - the main documentation set under `docs/` is in place
@@ -43,16 +45,19 @@ Repository status as of 2026-04-17:
 - OCR-based daily-only crop generation for real `2014 水位` tables is also implemented
 - the real-data crop path now uses a dedicated lower-left statistics ROI and accepts `平均` first, then constrained `平/均` weak anchors when full `平均` is missed
 - `ms-swift` manifest conversion for `GOT-OCR2.0` is implemented and smoke-tested
+- a shared `src/yearbook_ocr/` package now holds stable data, OCR, inference, and evaluation logic
+- unified GOT inference now runs through `scripts/models/got_ocr2/run_inference.py`
 - strict CSV evaluation is implemented and covered by tests
 - a Linux environment setup script is included
 - a `swift sft` wrapper for `GOT-OCR2.0` is included and validated on a smoke run
 - small sample outputs and manifest previews already exist under `data/`
-- `conda run -n got pytest -q` passes with `6 passed`
+- `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_strict_csv.py` passes with `21 passed`
 - a GOT-OCR2.0 LoRA smoke run already succeeded with `sdpa`
+- a single-GPU baseline training run produced reusable checkpoints under `outputs/got_ocr2_v0_single/`
 
 Still missing:
-- the first full multi-GPU `GOT-OCR2.0` LoRA training run
-- final inference and strict evaluation on real extracted table images
+- a durable full multi-GPU `GOT-OCR2.0` LoRA training route on this machine
+- a full formal benchmark report comparing base GOT vs fine-tuned GOT on the real extracted flow test set
 
 ## Verified Stable Path
 
@@ -86,14 +91,13 @@ Data notes:
 .
 ├── configs/                  # Experiment configuration
 ├── data/                     # Generated sample outputs and manifests
-├── datasets/                 # Source PDFs and calibrated CSV labels
+├── datasets/                 # Source PDFs, calibrated CSV labels, and thin real-data entrypoints
 ├── docs/                     # Project notes and detailed specifications
 ├── references/               # External reference code and papers
-├── datasets/*.py             # Real-data extraction, crop, and alignment utilities
-├── scripts/common/           # Shared flow-table utilities
-├── scripts/data/             # Data prep and synthetic generation
-├── scripts/eval/             # Evaluation
-├── scripts/models/           # Model-specific training adapters
+├── src/yearbook_ocr/         # Shared package for data, OCR, GOT inference, and evaluation
+├── scripts/data/             # Synthetic generation entrypoints
+├── scripts/eval/             # Thin evaluation wrappers
+├── scripts/models/           # Thin model-specific wrappers
 ├── tests/                    # Automated tests
 ├── AGENTS.md                 # Minimal contributor/agent guide
 ├── README.md                 # English homepage
@@ -119,7 +123,7 @@ python3 ./datasets/build_real_flow_alignment.py
 python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl
-python3 ./scripts/models/got_ocr2/run_inference.py --manifest data/manifests/flow_real_test_aligned.jsonl --limit 5
+python3 ./scripts/models/got_ocr2/run_inference.py --manifest data/manifests/flow_real_test_aligned.jsonl --limit 5 --backend official_chat --query-mode official_format
 python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/got_ocr2_v0.jsonl --output outputs/reports/got_ocr2_v0_eval.json
 ```
 

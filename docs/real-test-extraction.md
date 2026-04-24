@@ -23,6 +23,10 @@ The repository now also includes follow-up scripts for the extracted station-tab
 - `datasets/build_real_flow_alignment.py`: score and align calibrated CSV labels to OCR-cropped JPG files and emit a real-test manifest plus an audit report
 - `datasets/run_ocr_on_image.py`: run RapidOCR on any single debug image or ROI and print token-level OCR output
 
+These dataset-side scripts are thin entrypoints now. Shared implementation lives under:
+- `src/yearbook_ocr/data/`
+- `src/yearbook_ocr/ocr/`
+
 ## Current Target PDFs
 
 The current validated inputs are:
