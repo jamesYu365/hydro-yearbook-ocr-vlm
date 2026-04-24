@@ -155,7 +155,7 @@ fc-list :lang=zh family file
 
 ```bash
 python ./scripts/data/generate_synthetic_flow_v0.py --num-samples 100
-python ./scripts/data/build_real_test_manifest.py
+python ./datasets/build_real_flow_alignment.py
 python ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl
 ```

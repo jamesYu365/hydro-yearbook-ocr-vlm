@@ -10,12 +10,12 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 if __package__ is None or __package__ == "":
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
-from scripts.common.yearbook_flow_common import (
+from yearbook_ocr.common.jsonl import write_json as dump_json
+from yearbook_ocr.common.tabular import (
     csv_rows_to_got_format,
     csv_rows_to_text,
-    dump_json,
     is_blank_row,
     is_valid_numeric_token,
     month_day_limit,

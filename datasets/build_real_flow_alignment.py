@@ -7,14 +7,9 @@ import sys
 from pathlib import Path
 
 if __package__ is None or __package__ == "":
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from datasets.real_flow_test_prep import (
-    parse_csv_entry,
-    parse_image_entry,
-    resolve_reciprocal_matches,
-)
-from scripts.common.yearbook_flow_common import csv_rows_to_got_format, parse_csv_text, read_csv_text
+from yearbook_ocr.data.alignment import build_real_flow_alignment_manifest
 
 
 DEFAULT_IMAGE_DIR = Path(
@@ -29,45 +24,12 @@ def build_alignment_manifest(
     output_path: Path,
     audit_path: Path,
 ) -> dict[str, object]:
-    csv_entries = [parse_csv_entry(path) for path in sorted(dataset_dir.glob("*.csv"))]
-    image_entries = [parse_image_entry(path) for path in sorted(image_dir.glob("*.jpg"))]
-    rows, audit = resolve_reciprocal_matches(csv_entries, image_entries)
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as handle:
-        for row in rows:
-            csv_text, csv_encoding = read_csv_text(Path(row["csv_path"]))
-            csv_rows = parse_csv_text(csv_text)
-            payload = {
-                "sample_id": row["sample_id"],
-                "station_name": row["station_name_csv"],
-                "river": row["river_csv"],
-                "year": row["year"],
-                "csv_path": row["csv_path"],
-                "csv_encoding": csv_encoding,
-                "image_path": row["image_path"],
-                "title_text": row["image_title_text"],
-                "target_csv": csv_text,
-                "target_got_format": csv_rows_to_got_format(csv_rows),
-                "match_score": row["match_score"],
-                "match_status": row["match_status"],
-                "split": "test",
-                "source": "real",
-            }
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-
-    audit_path.parent.mkdir(parents=True, exist_ok=True)
-    audit_payload = {
-        "dataset_dir": dataset_dir.as_posix(),
-        "image_dir": image_dir.as_posix(),
-        **audit,
-        "rows": rows,
-    }
-    audit_path.write_text(
-        json.dumps(audit_payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+    return build_real_flow_alignment_manifest(
+        dataset_dir=dataset_dir,
+        image_dir=image_dir,
+        output_path=output_path,
+        audit_path=audit_path,
     )
-    return audit_payload
 
 
 def main() -> None:

@@ -108,13 +108,13 @@ v0 任务固定为：
 代表性命令：
 
 ```bash
-python3 ./scripts/data/build_real_test_manifest.py
 conda run -n rapid python ./datasets/crop_flow_table_daily_region.py
 conda run -n rapid python ./datasets/run_ocr_on_image.py 'datasets/derived/debug_rois/2014_水位/page_0004_table1_汉江汉川站_2014.jpg' --ocr-cuda off
 python3 ./datasets/build_real_flow_alignment.py
 python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl
+python3 ./scripts/models/got_ocr2/run_inference.py --manifest data/manifests/flow_real_test_aligned.jsonl --limit 5
 python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/got_ocr2_v0.jsonl --output outputs/reports/got_ocr2_v0_eval.json
 ```
 

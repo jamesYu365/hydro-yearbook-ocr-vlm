@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from datasets.real_flow_test_prep import (
+from yearbook_ocr.data.real_flow import (
     CsvEntry,
     ImageEntry,
     OcrToken,

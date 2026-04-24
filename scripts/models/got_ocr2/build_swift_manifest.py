@@ -1,37 +1,18 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
 if __package__ is None or __package__ == "":
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent / "src"))
 
-from scripts.common.yearbook_flow_common import DEFAULT_GOT_FORMAT_PROMPT
+from yearbook_ocr.common.tabular import DEFAULT_GOT_FORMAT_PROMPT
+from yearbook_ocr.data.manifests import build_swift_records
 
 
 def convert_records(input_path: Path, output_path: Path, prompt: str, response_field: str) -> int:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    count = 0
-    with input_path.open("r", encoding="utf-8") as src, output_path.open(
-        "w", encoding="utf-8"
-    ) as dst:
-        for line in src:
-            if not line.strip():
-                continue
-            record = json.loads(line)
-            if response_field not in record:
-                raise KeyError(f"Missing response field '{response_field}' in {input_path}")
-            payload = {
-                "query": f"<image>{prompt}",
-                "response": record[response_field],
-                "images": [record["image_path"]],
-                "sample_id": record["sample_id"],
-            }
-            dst.write(json.dumps(payload, ensure_ascii=False) + "\n")
-            count += 1
-    return count
+    return build_swift_records(input_path, output_path, prompt, response_field)
 
 
 def main() -> None:

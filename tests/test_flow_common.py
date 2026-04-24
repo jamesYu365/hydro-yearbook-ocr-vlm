@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scripts.common.yearbook_flow_common import (
+from yearbook_ocr.common.tabular import (
     csv_rows_to_got_format,
     month_day_limit,
     parse_station_meta,

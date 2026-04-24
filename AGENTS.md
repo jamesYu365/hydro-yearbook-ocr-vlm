@@ -14,6 +14,8 @@ This repository is for fine-tuning and evaluating a VLM on hydrological yearbook
 - Use the `got` conda environment for this project.
 - Keep data-generation code and model-specific code in separate directories.
 - Keep dataset preprocessing, extraction, alignment, and crop-generation code under `datasets/` rather than `scripts/`.
+- Prefer one parameterized inference/eval entrypoint per model workflow rather than adding overlapping one-off scripts for single-image, small-batch, and full-set runs.
+- When a temporary probe script proves useful, consolidate it back into the main inference/eval entrypoint instead of letting multiple near-duplicate scripts accumulate.
 - Do not change the main algorithm for real-data preprocessing without explicit user confirmation; fallback or experimental paths must stay opt-in.
 - Do not ask the agent to run `git push` for this repository; the terminal may not have GitHub credentials configured. Remind the user to run `git push origin <branch>` manually when needed.
 - Commit messages must follow this format: one summary line, then a blank line, then flat bullet summaries for the key changes.

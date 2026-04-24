@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 if __package__ is None or __package__ == "":
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent / "src"))
 
-from yearbook_ocr.data.extract_tables import main
+from yearbook_ocr.models.got_ocr2.inference import main
 
 
 if __name__ == "__main__":

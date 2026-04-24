@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
 import dataclasses
 import json
 import os
-import sys
 import time
 from enum import auto, Enum
 from pathlib import Path
@@ -17,17 +15,14 @@ from torchvision import transforms
 from torchvision.transforms.functional import InterpolationMode
 from transformers import AutoModel, AutoTokenizer, StoppingCriteria
 
-if __package__ is None or __package__ == "":
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
-
-from scripts.common.yearbook_flow_common import DEFAULT_PROMPT
-
+from yearbook_ocr.common.jsonl import load_jsonl, write_json, write_jsonl
+from yearbook_ocr.common.tabular import DEFAULT_GOT_FORMAT_PROMPT, DEFAULT_PROMPT
 
 DEFAULT_MANIFEST = Path("data/manifests/flow_real_test_aligned.jsonl")
 DEFAULT_BASE_MODEL = Path("outputs/cache/modelscope/models/stepfun-ai/GOT-OCR2_0")
+DEFAULT_BASE_OUTPUT_DIR = Path("outputs/got_ocr2_base")
 DEFAULT_CACHE_ROOT = Path("outputs/cache")
 DEFAULT_SYSTEM = "        You should follow the instructions carefully and explain your answers in detail."
-DEFAULT_SINGLE_QUERY = "OCR with format: "
 
 
 class SeparatorStyle(Enum):
@@ -93,13 +88,10 @@ class Conversation:
 
 
 class KeywordsStoppingCriteria(StoppingCriteria):
-
     def __init__(self, keywords: list[str], tokenizer: Any, input_ids: torch.Tensor) -> None:
         self.keywords = keywords
         self.keyword_ids = [tokenizer(keyword).input_ids for keyword in keywords]
-        self.keyword_ids = [
-            keyword_id[0] for keyword_id in self.keyword_ids if isinstance(keyword_id, list) and len(keyword_id) == 1
-        ]
+        self.keyword_ids = [keyword_id[0] for keyword_id in self.keyword_ids if isinstance(keyword_id, list) and len(keyword_id) == 1]
         self.tokenizer = tokenizer
         self.start_len = None
         self.input_ids = input_ids
@@ -116,7 +108,6 @@ class KeywordsStoppingCriteria(StoppingCriteria):
 
 
 class GOTImageEvalProcessor:
-
     def __init__(self, image_size: int = 1024) -> None:
         mean = (0.48145466, 0.4578275, 0.40821073)
         std = (0.26862954, 0.26130258, 0.27577711)
@@ -165,25 +156,16 @@ def resolve_dtype(dtype: str, device: str) -> torch.dtype:
 
 def build_lora_config(adapter_dir: Path) -> Any:
     from peft import LoraConfig
+    import json
 
-    config_path = adapter_dir / "adapter_config.json"
-    payload = json.loads(config_path.read_text(encoding="utf-8"))
-    target_modules = [
-        "q_proj",
-        "k_proj",
-        "v_proj",
-        "o_proj",
-        "gate_proj",
-        "up_proj",
-        "down_proj",
-    ]
+    payload = json.loads((adapter_dir / "adapter_config.json").read_text(encoding="utf-8"))
     return LoraConfig(
         r=payload["r"],
         lora_alpha=payload["lora_alpha"],
         lora_dropout=payload["lora_dropout"],
         bias=payload["bias"],
         task_type=payload["task_type"],
-        target_modules=target_modules,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
         inference_mode=True,
     )
 
@@ -200,17 +182,10 @@ def load_lora_weights(model: Any, adapter_dir: Path) -> None:
     missing, unexpected = model.load_state_dict(renamed_state, strict=False)
     missing = [item for item in missing if ".lora_" in item]
     if missing or unexpected:
-        raise RuntimeError(
-            f"LoRA state_dict mismatch. missing={missing[:5]} unexpected={unexpected[:5]}"
-        )
+        raise RuntimeError(f"LoRA state_dict mismatch. missing={missing[:5]} unexpected={unexpected[:5]}")
 
 
-def load_model(
-    base_model: Path,
-    adapter_dir: Path | None,
-    device: str,
-    dtype: torch.dtype,
-) -> tuple[Any, Any]:
+def load_model(base_model: Path, adapter_dir: Path | None, device: str, dtype: torch.dtype) -> tuple[Any, Any]:
     tokenizer = AutoTokenizer.from_pretrained(base_model.as_posix(), trust_remote_code=True)
     device_map = device if device != "cpu" else "cpu"
     model = AutoModel.from_pretrained(
@@ -222,15 +197,12 @@ def load_model(
         use_safetensors=True,
         pad_token_id=151643,
     ).eval()
-
     if adapter_dir is not None:
         from peft import get_peft_model
 
-        lora_config = build_lora_config(adapter_dir)
-        model = get_peft_model(model, lora_config)
+        model = get_peft_model(model, build_lora_config(adapter_dir))
         load_lora_weights(model, adapter_dir)
         model.eval()
-
     return model, tokenizer
 
 
@@ -251,20 +223,11 @@ def build_conversation_prompt(query: str) -> tuple[str, str]:
     return conv.get_prompt(), conv.sep
 
 
-def load_manifest(path: Path) -> list[dict[str, Any]]:
-    rows = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            if line.strip():
-                rows.append(json.loads(line))
-    return rows
-
-
 def clean_prediction(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def infer_one(
+def infer_one_local(
     model: Any,
     tokenizer: Any,
     image_processor: GOTImageEvalProcessor,
@@ -306,86 +269,139 @@ def infer_one(
                 max_new_tokens=max_new_tokens,
                 stopping_criteria=[stopping_criteria],
             )
-    generated = tokenizer.decode(output_ids[0, input_ids.shape[1] :]).strip()
+    generated = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).strip()
     if generated.endswith(stop_str):
         generated = generated[:-len(stop_str)]
     return clean_prediction(generated.strip())
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Run GOT-OCR2.0 on the aligned real flow daily test set.")
-    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
-    parser.add_argument("--base-model", type=Path, default=DEFAULT_BASE_MODEL)
-    parser.add_argument("--adapter-dir", type=Path)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--model-label", type=str, required=True)
-    parser.add_argument("--query", type=str, default=DEFAULT_PROMPT)
-    parser.add_argument("--device", type=str, default="auto")
-    parser.add_argument("--dtype", type=str, default="auto", choices=("auto", "float16", "bfloat16", "float32"))
-    parser.add_argument("--max-new-tokens", type=int, default=4096)
-    parser.add_argument("--limit", type=int)
-    parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
-    args = parser.parse_args()
+def infer_one_official(model: Any, tokenizer: Any, image_path: Path) -> str:
+    chat_fn = getattr(model, "chat", None)
+    if chat_fn is None and hasattr(model, "base_model"):
+        chat_fn = getattr(model.base_model, "chat", None)
+    if chat_fn is None:
+        raise RuntimeError("Loaded model does not expose chat().")
+    return chat_fn(tokenizer, image_path.as_posix(), "format")
 
+
+def resolve_query(query_mode: str, query: str | None) -> str:
+    if query is not None:
+        return query
+    if query_mode == "official_format":
+        return DEFAULT_GOT_FORMAT_PROMPT
+    return DEFAULT_PROMPT
+
+
+def default_output_path(
+    adapter_dir: Path | None,
+    backend: str,
+    single_image: bool,
+    image_path: Path | None,
+    limit: int | None,
+) -> Path:
+    root = adapter_dir if adapter_dir is not None else DEFAULT_BASE_OUTPUT_DIR
+    if single_image and image_path is not None:
+        return root / f"{image_path.stem}_{backend}.json"
+    limit_suffix = f"first{limit}" if limit is not None else "all"
+    return root / f"flow_real_{limit_suffix}_{backend}.jsonl"
+
+
+def build_single_record(image_path: Path) -> dict[str, Any]:
+    return {
+        "sample_id": image_path.stem,
+        "image_path": image_path.as_posix(),
+    }
+
+
+def run_inference(args: argparse.Namespace) -> Path:
     set_cache_env(args.cache_root)
     device = resolve_device(args.device)
     dtype = resolve_dtype(args.dtype, device)
-    rows = load_manifest(args.manifest)
-    if args.limit is not None:
-        rows = rows[: args.limit]
+    query = resolve_query(args.query_mode, args.query)
+
+    if args.image is not None:
+        rows = [build_single_record(args.image)]
+        single_image = True
+    else:
+        rows = load_jsonl(args.manifest)
+        if args.limit is not None:
+            rows = rows[: args.limit]
+        single_image = False
+
+    output_path = args.output or default_output_path(
+        args.adapter_dir,
+        args.backend,
+        single_image,
+        args.image,
+        args.limit,
+    )
 
     start_time = time.time()
     model, tokenizer = load_model(args.base_model, args.adapter_dir, device, dtype)
     image_processor = GOTImageEvalProcessor(image_size=1024)
+    records: list[dict[str, Any]] = []
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    with args.output.open("w", encoding="utf-8") as handle:
-        for index, row in enumerate(rows, start=1):
-            image_path = Path(row["image_path"])
-            prediction = infer_one(
+    for index, row in enumerate(rows, start=1):
+        image_path = Path(row["image_path"])
+        if args.backend == "official_chat":
+            prediction = infer_one_official(model, tokenizer, image_path)
+        else:
+            prediction = infer_one_local(
                 model=model,
                 tokenizer=tokenizer,
                 image_processor=image_processor,
-                query=args.query,
+                query=query,
                 image_path=image_path,
                 max_new_tokens=args.max_new_tokens,
             )
-            payload = {
-                "sample_id": row["sample_id"],
-                "image_path": row["image_path"],
-                "target_csv": row["target_csv"],
-                "prediction": prediction,
-                "model_label": args.model_label,
-            }
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-            print(
-                json.dumps(
-                    {
-                        "index": index,
-                        "count": len(rows),
-                        "sample_id": row["sample_id"],
-                        "image_path": row["image_path"],
-                    },
-                    ensure_ascii=False,
-                )
-            )
+        payload = {
+            "index": index,
+            "sample_id": row["sample_id"],
+            "image_path": row["image_path"],
+            "prediction": prediction,
+            "backend": args.backend,
+            "query_mode": args.query_mode,
+            "query": query,
+            "device": device,
+            "dtype": str(dtype),
+        }
+        if "target_csv" in row:
+            payload["target_csv"] = row["target_csv"]
+        if "target_got_format" in row:
+            payload["target_got_format"] = row["target_got_format"]
+        records.append(payload)
+        print(json.dumps({"index": index, "sample_id": row["sample_id"]}, ensure_ascii=False))
 
-    elapsed = time.time() - start_time
-    print(
-        json.dumps(
-            {
-                "model_label": args.model_label,
-                "count": len(rows),
-                "device": device,
-                "dtype": str(dtype),
-                "elapsed_sec": round(elapsed, 3),
-                "output": args.output.as_posix(),
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
+    elapsed = round(time.time() - start_time, 3)
+    if single_image:
+        payload = records[0]
+        payload["elapsed_sec"] = elapsed
+        write_json(output_path, payload)
+    else:
+        write_jsonl(output_path, records)
+    return output_path
 
 
-if __name__ == "__main__":
-    main()
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Unified GOT-OCR2.0 inference entrypoint.")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--image", type=Path, help="Run inference on a single image.")
+    source.add_argument("--manifest", type=Path, help="Run inference on a manifest jsonl.")
+    parser.add_argument("--base-model", type=Path, default=DEFAULT_BASE_MODEL)
+    parser.add_argument("--adapter-dir", type=Path)
+    parser.add_argument("--backend", choices=("official_chat", "local_generate"), default="official_chat")
+    parser.add_argument("--query-mode", choices=("official_format", "custom_default"), default="official_format")
+    parser.add_argument("--query", type=str)
+    parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--dtype", type=str, default="auto", choices=("auto", "float16", "bfloat16", "float32"))
+    parser.add_argument("--max-new-tokens", type=int, default=4096)
+    parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
+    parser.add_argument("--limit", type=int)
+    parser.add_argument("--output", type=Path)
+    return parser
+
+
+def main() -> None:
+    args = build_arg_parser().parse_args()
+    output_path = run_inference(args)
+    print(output_path.as_posix())
