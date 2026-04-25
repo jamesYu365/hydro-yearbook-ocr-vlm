@@ -130,8 +130,8 @@ pytest -q
 ```
 
 Current verified result on this project:
-- `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_strict_csv.py`
-- output: `21 passed`
+- focused data, manifest, inference, and evaluation suites pass in the `got` environment
+- current key command: `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_strict_csv.py tests/test_generate_synthetic_flow_v0.py tests/test_got_inference.py tests/test_model_comparison.py`
 
 ## Chinese Fonts
 
@@ -155,7 +155,7 @@ fc-list :lang=zh family file
 ## Project Smoke Test
 
 ```bash
-python ./scripts/data/generate_synthetic_flow_v0.py --num-samples 100
+python ./scripts/data/generate_synthetic_flow_v0.py --num-samples 100 --val-ratio 0.2 --seed 20260408
 python ./datasets/build_real_flow_alignment.py
 python ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl

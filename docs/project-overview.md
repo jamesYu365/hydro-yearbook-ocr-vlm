@@ -4,7 +4,7 @@
 
 Hydro Yearbook OCR VLM is a focused project for fine-tuning a vision-language model on hydrological yearbook OCR, starting from fixed-layout flow tables.
 
-The immediate v0 objective is:
+The immediate objective is:
 - fine-tune `GOT-OCR2.0`
 - train mainly on high-fidelity synthetic flow tables
 - evaluate on real calibrated flow tables
@@ -34,13 +34,13 @@ Existing generated artifacts under `data/` already include:
 - a `ms-swift` manifest preview
 
 The current verified status as of 2026-04-24 is:
-- `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_strict_csv.py` passes with `21 passed`
+- focused data, manifest, inference, and evaluation suites pass in `got`
 - synthetic data generation smoke test has passed
 - real test manifest generation has passed with 35 records
-- `train_swift.jsonl` and `val_swift.jsonl` have been built successfully
+- v1 `train_swift.jsonl` and `val_swift.jsonl` have been built successfully with `8000` train records and `2000` validation records
 - a GOT-OCR2.0 LoRA smoke training run has succeeded with `sdpa`
 - single-GPU training is the currently verified stable baseline route on this machine
-- a reusable single-GPU checkpoint set exists under `outputs/got_ocr2_v0_single/`
+- the next model step is to train a fresh LoRA checkpoint on the v1 synthetic Swift manifests
 
 The current verified status as of 2026-04-13 additionally includes:
 - real-test PDF extraction ran successfully in the `rapid` environment
@@ -65,11 +65,11 @@ The current verified status as of 2026-04-19 additionally includes:
 - `2014 水位` metadata currently reports `28` `average_anchor` crops and `19` `weak_average_anchor` crops
 - `year_stats_anchor` is no longer used in the formal real-data crop path
 
-## v0 Scope
+## Current Scope
 
-The current v0 direction is intentionally narrow:
+The current direction is intentionally narrow:
 - focus on `流量` only
-- keep `水位` out of the v0 training and final evaluation scope
+- keep `水位` out of the current training and final evaluation scope
 - use one fixed flow-table layout
 - use synthetic data for train and validation
 - use real calibrated flow tables for final test only
@@ -78,10 +78,12 @@ The current v0 direction is intentionally narrow:
 ## Current Gaps
 
 The main remaining execution gaps are:
-- run a formal base-vs-fine-tuned comparison on the real extracted flow tables
+- train the v1 LoRA model from the current synthetic Swift manifests
+- rerun base and fine-tuned inference on the real extracted flow tables
+- run a formal base-vs-v1-fine-tuned comparison on the real extracted flow tables
 - decide whether to keep the official GOT-format target as the primary benchmark target or reintroduce a first-class CSV benchmark
 
-The main remaining real-data gap outside the v0 benchmark is:
+The main remaining real-data gap outside the current flow benchmark is:
 - `2014 水位` still lacks calibrated CSV labels in the repository, so no alignment manifest or strict evaluation has been built for it yet
 
 ## Current Recommended Training Route
@@ -108,7 +110,8 @@ Important environment findings from the verified smoke run:
 
 - Calibrated CSV files are the source-of-truth labels.
 - Existing CSV files may use local Chinese encodings rather than UTF-8.
-- Empty separator rows in the CSV should be preserved because they reflect the original table structure.
+- Raw calibrated CSV files and filenames should be preserved.
+- Manifest targets remove fully empty separator rows but preserve empty cells inside non-empty rows and natural calendar blanks.
 - Existing filenames encode station, year, and river context and should be preserved.
 
 ## Code Organization

@@ -1,6 +1,6 @@
 # Experiment Plan
 
-## v0 Goal
+## Goal
 
 Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evaluate on the real calibrated flow test set.
 
@@ -31,8 +31,9 @@ Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evalu
 - unit tests are passing in `got`
 - synthetic data smoke generation has passed
 - the real test manifest has been built with 35 records
-- `train_swift.jsonl` and `val_swift.jsonl` have been built
+- v1 `train_swift.jsonl` and `val_swift.jsonl` have been built with `8000` train records and `2000` validation records
 - a 1-step GOT-OCR2.0 LoRA smoke run has passed with `sdpa`
+- the v1 synthetic targets remove fully empty separator rows while preserving empty cells inside data rows
 
 ## Metrics
 
@@ -43,7 +44,7 @@ Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evalu
 ## Current Execution Order
 
 1. extract real station-level table images from the PDF
-2. launch the first full multi-GPU `GOT-OCR2.0` LoRA run
-3. run final inference on the real extracted test set
-4. evaluate on the real test set without output repair
+2. train `GOT-OCR2.0` LoRA from the v1 synthetic Swift manifests
+3. rerun base and fine-tuned inference on the real extracted test set
+4. run model comparison and strict CSV-compatible evaluation where the prediction target supports it
 5. inspect representative failure cases and tag them

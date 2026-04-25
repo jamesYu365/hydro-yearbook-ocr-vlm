@@ -2,12 +2,12 @@
 
 ## Recommended Path
 
-For this repository, use `ms-swift + LoRA` for v0 instead of modifying the native GOT training code first.
+For this repository, use `ms-swift + LoRA` for the current benchmark instead of modifying the native GOT training code first.
 
 Reason:
 - the official repository already documents `ms-swift` fine-tuning for custom data
 - the native GOT training path requires editing internal dataset registration in `constants.py` and `conversation_dataset_qwen.py`
-- v0 only needs a stable single-model baseline on fixed-layout flow tables
+- the current scope only needs a stable single-model baseline on fixed-layout flow tables
 
 Reference code:
 - `references/GOT-OCR2.0-main/GOT-OCR-2.0-master/GOT/train/train_GOT.py`
@@ -31,13 +31,14 @@ Then verify the result against the current stable path documented in [environmen
 
 ## Current Verified Status
 
-The current verified training state as of 2026-04-08 is:
-- tests pass in `got` with `21 passed` on the current focused suite
+The current verified training state as of 2026-04-24 is:
+- focused data, manifest, inference, and evaluation suites pass in `got`
 - synthetic data smoke generation has passed
 - real test manifest generation has passed with 35 records
-- `train_swift.jsonl` and `val_swift.jsonl` have been built successfully
+- v1 `train_swift.jsonl` and `val_swift.jsonl` have been built successfully with `8000` train records and `2000` validation records
 - a GOT-OCR2.0 LoRA smoke training run has succeeded with `sdpa`
 - single-GPU training has been validated as the current stable route on this machine
+- the next training task is a fresh LoRA run on the v1 synthetic Swift manifests
 
 Recorded smoke run:
 - output directory: `outputs/got_ocr2_v0_smoke_sdpa/v0-20260408-133207`
@@ -50,7 +51,7 @@ Recorded smoke run:
 1. Generate synthetic tables:
 
 ```bash
-python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000
+python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000 --val-ratio 0.2 --seed 20260408 --num-workers 16
 ```
 
 2. Build `ms-swift` manifests:
@@ -70,7 +71,7 @@ The current default manifest conversion path uses:
 - `query`: official GOT format prompt
 - `response`: `target_got_format`
 
-The calibrated CSV label is still retained alongside the manifest source rows as `target_csv`.
+The calibrated CSV label is still retained alongside the manifest source rows as `target_csv`. Manifest targets remove fully empty separator rows while preserving empty cells inside data rows and natural calendar blanks.
 
 ## Training Procedure
 
@@ -80,7 +81,7 @@ The calibrated CSV label is still retained alongside the manifest source rows as
 4. Select the best checkpoint by external evaluation on synthetic validation data.
 5. Run final inference on the real extracted flow table images.
 
-Suggested v0 defaults:
+Suggested current defaults:
 - model: `stepfun-ai/GOT-OCR2_0`
 - method: LoRA
 - attention backend: `sdpa`
@@ -171,6 +172,7 @@ GRADIENT_CHECKPOINTING_KWARGS='{"use_reentrant": false}' \
 SAVE_STEPS=200 \
 EVAL_STEPS=200 \
 LOGGING_STEPS=20 \
+OUTPUT_DIR=outputs/got_ocr2_v1_swift \
 bash ./scripts/models/got_ocr2/run_swift_sft.sh
 ```
 
@@ -189,6 +191,7 @@ GRADIENT_CHECKPOINTING_KWARGS='{"use_reentrant": false}' \
 SAVE_STEPS=20 \
 EVAL_STEPS=20 \
 LOGGING_STEPS=20 \
+OUTPUT_DIR=outputs/got_ocr2_v1_swift \
 bash ./scripts/models/got_ocr2/run_swift_sft.sh
 ```
 
@@ -220,7 +223,7 @@ Preferred direction for the next multi-GPU attempt:
 - `MAX_LENGTH=3072`
 
 Current recommendation:
-- proceed with the single-GPU baseline first
+- run the v1 synthetic training pass through the verified single-GPU route first
 - treat multi-GPU tuning as a separate follow-up task
 
 ## Model Weights And Cache
@@ -233,7 +236,7 @@ There are two different kinds of artifacts during training:
 The fine-tuning outputs should stay inside this project, for example:
 
 ```bash
-outputs/got_ocr2_v0_swift/
+outputs/got_ocr2_v1_swift/
 ```
 
 The base model weights do not have to live inside the project root, but using a project-local cache is often easier to inspect and reproduce.
@@ -298,12 +301,18 @@ This repository uses strict raw-output evaluation:
 Run evaluation after inference with:
 
 ```bash
-python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/got_ocr2_v0.jsonl --output outputs/reports/got_ocr2_v0_eval.json
+python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/got_ocr2_v1_swift/<run-id>/eval/<checkpoint>/flow_real_all_official_chat.jsonl --output outputs/reports/got_ocr2_v1_swift_eval.json
 ```
+
+By default, inference writes adapter runs under the model run directory, for example
+`outputs/got_ocr2_v1_swift/<run-id>/eval/<checkpoint>/`. Base-model inference writes under
+`outputs/got_ocr2_base/eval/checkpoint-0/`. Per-image exports are opt-in with `--per-image-format raw` or
+`--per-image-format latex`; their default directories are `per_image_raw/` and `per_image_latex/` under the JSONL parent.
+The `latex` export only pretty-prints line breaks around LaTeX table commands; it does not repair table structure.
 
 ## Notes
 
 - The current repository already includes the data-prep and training adapter scripts.
-- Real test image extraction from the source PDF is still a separate task.
+- Real test image extraction from the source PDF is implemented; rerun it only when source PDFs or crop rules change.
 - If `ms-swift` is not available in `got`, install it there rather than in another environment.
-- The next meaningful training milestone is the first full multi-GPU run, not another fresh environment bootstrap.
+- The next meaningful training milestone is the v1 synthetic LoRA run, not another fresh environment bootstrap.

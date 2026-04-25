@@ -11,7 +11,7 @@ CSV_ENCODINGS = ("utf-8-sig", "utf-8", "gb18030", "gbk")
 DEFAULT_PROMPT = (
     "Read the table in the image and output only CSV text.\n"
     "Keep the original comma-separated structure.\n"
-    "Keep empty rows and empty cells exactly as shown.\n"
+    "Omit fully empty separator rows, but keep empty cells inside data rows.\n"
     "Do not add explanations, titles, markdown fences, or extra text.\n"
     "Do not normalize number formats.\n"
     "Do not fill in missing values."
@@ -48,6 +48,10 @@ def csv_rows_to_text(rows: Iterable[Iterable[str]]) -> str:
     for row in rows:
         lines.append(",".join(str(cell) for cell in row))
     return "\n".join(lines) + "\n"
+
+
+def remove_blank_rows(rows: Iterable[Iterable[str]]) -> list[list[str]]:
+    return [list(row) for row in rows if not is_blank_row([str(cell) for cell in row])]
 
 
 def csv_rows_to_got_format(rows: Iterable[Iterable[str]]) -> str:

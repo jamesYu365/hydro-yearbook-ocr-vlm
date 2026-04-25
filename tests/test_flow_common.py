@@ -2,6 +2,7 @@ from pathlib import Path
 
 from yearbook_ocr.common.tabular import (
     csv_rows_to_got_format,
+    remove_blank_rows,
     month_day_limit,
     parse_station_meta,
     sample_id_from_name,
@@ -37,3 +38,18 @@ def test_csv_rows_to_got_format() -> None:
     assert "1 & 29.5 & 19 \\\\" in text
     assert "2 &  & 19.2 \\\\" in text
     assert text.endswith("\\end{tabular}\n")
+
+
+def test_remove_blank_rows_keeps_empty_cells_inside_data_rows() -> None:
+    rows = [
+        ["日期", "一月", "二月"],
+        ["1", "29.5", ""],
+        ["", "", ""],
+        ["2", "", "19.2"],
+    ]
+
+    assert remove_blank_rows(rows) == [
+        ["日期", "一月", "二月"],
+        ["1", "29.5", ""],
+        ["2", "", "19.2"],
+    ]

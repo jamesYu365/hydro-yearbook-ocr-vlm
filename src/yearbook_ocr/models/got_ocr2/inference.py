@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import json
 import os
+import subprocess
+import sys
 import time
 from enum import auto, Enum
 from pathlib import Path
@@ -16,6 +17,7 @@ from torchvision.transforms.functional import InterpolationMode
 from transformers import AutoModel, AutoTokenizer, StoppingCriteria
 
 from yearbook_ocr.common.jsonl import load_jsonl, write_json, write_jsonl
+from yearbook_ocr.common.progress import progress
 from yearbook_ocr.common.tabular import DEFAULT_GOT_FORMAT_PROMPT, DEFAULT_PROMPT
 
 DEFAULT_MANIFEST = Path("data/manifests/flow_real_test_aligned.jsonl")
@@ -23,6 +25,7 @@ DEFAULT_BASE_MODEL = Path("outputs/cache/modelscope/models/stepfun-ai/GOT-OCR2_0
 DEFAULT_BASE_OUTPUT_DIR = Path("outputs/got_ocr2_base")
 DEFAULT_CACHE_ROOT = Path("outputs/cache")
 DEFAULT_SYSTEM = "        You should follow the instructions carefully and explain your answers in detail."
+BASE_EVAL_CHECKPOINT = "checkpoint-0"
 
 
 class SeparatorStyle(Enum):
@@ -298,12 +301,150 @@ def default_output_path(
     single_image: bool,
     image_path: Path | None,
     limit: int | None,
+    shard_id: int | None,
+    num_shards: int | None,
 ) -> Path:
-    root = adapter_dir if adapter_dir is not None else DEFAULT_BASE_OUTPUT_DIR
+    root = default_eval_dir(adapter_dir)
     if single_image and image_path is not None:
         return root / f"{image_path.stem}_{backend}.json"
     limit_suffix = f"first{limit}" if limit is not None else "all"
+    if shard_id is not None and num_shards is not None:
+        return root / f"flow_real_{limit_suffix}_{backend}.shard{shard_id}of{num_shards}.jsonl"
     return root / f"flow_real_{limit_suffix}_{backend}.jsonl"
+
+
+def default_eval_dir(adapter_dir: Path | None) -> Path:
+    if adapter_dir is None:
+        return DEFAULT_BASE_OUTPUT_DIR / "eval" / BASE_EVAL_CHECKPOINT
+    if adapter_dir.name.startswith("checkpoint-"):
+        return adapter_dir.parent / "eval" / adapter_dir.name
+    return adapter_dir / "eval" / BASE_EVAL_CHECKPOINT
+
+
+def default_per_image_dir(output_path: Path, export_format: str) -> Path:
+    return output_path.parent / f"per_image_{export_format}"
+
+
+def per_image_extension(export_format: str) -> str:
+    if export_format == "latex":
+        return "tex"
+    if export_format == "raw":
+        return "txt"
+    raise ValueError(f"Unsupported per-image export format: {export_format}")
+
+
+def pretty_latex_tabular(text: str) -> str:
+    normalized = clean_prediction(text)
+    if "\\begin{tabular}" not in normalized:
+        return normalized.rstrip() + "\n"
+
+    lines: list[str] = []
+    for raw_line in normalized.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        while "\\hline" in line:
+            before, _, after = line.partition("\\hline")
+            if before.strip():
+                lines.append(before.strip())
+            lines.append("\\hline")
+            line = after.strip()
+        if line:
+            lines.append(line)
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def format_per_image_prediction(prediction: str, export_format: str) -> str:
+    if export_format == "raw":
+        return clean_prediction(prediction).rstrip() + "\n"
+    if export_format == "latex":
+        return pretty_latex_tabular(prediction)
+    raise ValueError(f"Unsupported per-image export format: {export_format}")
+
+
+def per_image_file_stem(record: dict[str, Any]) -> str:
+    image_path = record.get("image_path")
+    if image_path:
+        return Path(str(image_path)).stem
+    return str(record["sample_id"])
+
+
+def with_shard_suffix(output_path: Path, shard_id: int, num_shards: int) -> Path:
+    if output_path.suffix:
+        return output_path.with_name(
+            f"{output_path.stem}.shard{shard_id}of{num_shards}{output_path.suffix}"
+        )
+    return output_path.with_name(f"{output_path.name}.shard{shard_id}of{num_shards}")
+
+
+def remove_shard_outputs(input_paths: list[Path]) -> None:
+    for path in input_paths:
+        path.unlink(missing_ok=True)
+
+
+def index_existing_records(output_path: Path, overwrite: bool) -> dict[str, dict[str, Any]]:
+    if overwrite or not output_path.exists() or output_path.suffix != ".jsonl":
+        return {}
+    existing: dict[str, dict[str, Any]] = {}
+    for record in load_jsonl(output_path):
+        sample_id = record.get("sample_id")
+        if sample_id is None:
+            continue
+        existing[sample_id] = record
+    return existing
+
+
+def build_inference_payload(
+    index: int,
+    row: dict[str, Any],
+    prediction: str,
+    backend: str,
+    query_mode: str,
+    query: str,
+    device: str,
+    dtype: torch.dtype,
+    single_image: bool,
+    shard_id: int | None,
+    num_shards: int | None,
+) -> dict[str, Any]:
+    payload = {
+        "index": index,
+        "sample_id": row["sample_id"],
+        "image_path": row["image_path"],
+        "prediction": prediction,
+        "backend": backend,
+        "query_mode": query_mode,
+        "query": query,
+        "device": device,
+        "dtype": str(dtype),
+    }
+    if not single_image:
+        payload["shard_id"] = shard_id
+        payload["num_shards"] = num_shards
+    if "target_csv" in row:
+        payload["target_csv"] = row["target_csv"]
+    if "target_got_format" in row:
+        payload["target_got_format"] = row["target_got_format"]
+    return payload
+
+
+def merge_records_preserving_existing(
+    existing_records: dict[str, dict[str, Any]],
+    selected_records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not existing_records:
+        return selected_records
+    selected_by_id = {record["sample_id"]: record for record in selected_records}
+    merged: list[dict[str, Any]] = []
+    emitted: set[str] = set()
+    for sample_id, record in existing_records.items():
+        merged.append(selected_by_id.get(sample_id, record))
+        emitted.add(sample_id)
+    for record in selected_records:
+        sample_id = record["sample_id"]
+        if sample_id not in emitted:
+            merged.append(record)
+    return merged
 
 
 def build_single_record(image_path: Path) -> dict[str, Any]:
@@ -311,6 +452,131 @@ def build_single_record(image_path: Path) -> dict[str, Any]:
         "sample_id": image_path.stem,
         "image_path": image_path.as_posix(),
     }
+
+
+def validate_shard_args(num_shards: int | None, shard_id: int | None) -> None:
+    if num_shards is None and shard_id is None:
+        return
+    if num_shards is None or shard_id is None:
+        raise ValueError("--num-shards and --shard-id must be provided together.")
+    if num_shards < 1:
+        raise ValueError("--num-shards must be >= 1.")
+    if shard_id < 0 or shard_id >= num_shards:
+        raise ValueError("--shard-id must satisfy 0 <= shard_id < num_shards.")
+
+
+def parse_gpu_ids(gpu_ids: str | None) -> list[str]:
+    if gpu_ids is None:
+        return []
+    values = [item.strip() for item in gpu_ids.split(",") if item.strip()]
+    if not values:
+        raise ValueError("--gpu-ids must contain at least one GPU id.")
+    return values
+
+
+def apply_shard(rows: list[dict[str, Any]], num_shards: int | None, shard_id: int | None) -> list[dict[str, Any]]:
+    validate_shard_args(num_shards, shard_id)
+    if num_shards is None or shard_id is None:
+        return rows
+    return rows[shard_id::num_shards]
+
+
+def build_child_command(args: argparse.Namespace, shard_id: int, num_shards: int, shard_output: Path) -> list[str]:
+    command = [
+        sys.executable,
+        Path(sys.argv[0]).resolve().as_posix(),
+        "--manifest",
+        args.manifest.as_posix(),
+        "--backend",
+        args.backend,
+        "--query-mode",
+        args.query_mode,
+        "--device",
+        "cuda:0",
+        "--dtype",
+        args.dtype,
+        "--max-new-tokens",
+        str(args.max_new_tokens),
+        "--cache-root",
+        args.cache_root.as_posix(),
+        "--num-shards",
+        str(num_shards),
+        "--shard-id",
+        str(shard_id),
+        "--output",
+        shard_output.as_posix(),
+        "--no-progress",
+    ]
+    if args.base_model != DEFAULT_BASE_MODEL:
+        command.extend(["--base-model", args.base_model.as_posix()])
+    if args.adapter_dir is not None:
+        command.extend(["--adapter-dir", args.adapter_dir.as_posix()])
+    if args.query is not None:
+        command.extend(["--query", args.query])
+    if args.limit is not None:
+        command.extend(["--limit", str(args.limit)])
+    if args.per_image_format is not None:
+        command.extend(["--per-image-format", args.per_image_format])
+    if args.per_image_dir is not None:
+        command.extend(["--per-image-dir", args.per_image_dir.as_posix()])
+    if args.overwrite:
+        command.append("--overwrite")
+    return command
+
+
+def run_multi_gpu_inference(args: argparse.Namespace) -> Path:
+    gpu_ids = parse_gpu_ids(args.gpu_ids)
+    if args.image is not None:
+        raise ValueError("--gpu-ids is only supported with --manifest.")
+    if args.num_shards is not None or args.shard_id is not None:
+        raise ValueError("--gpu-ids cannot be combined with --num-shards/--shard-id.")
+
+    final_output = args.output or default_output_path(
+        args.adapter_dir,
+        args.backend,
+        single_image=False,
+        image_path=None,
+        limit=args.limit,
+        shard_id=None,
+        num_shards=None,
+    )
+    final_output.parent.mkdir(parents=True, exist_ok=True)
+
+    shard_outputs = [with_shard_suffix(final_output, idx, len(gpu_ids)) for idx in range(len(gpu_ids))]
+    processes: list[tuple[int, str, Path, subprocess.Popen[str]]] = []
+
+    for shard_id, gpu_id in enumerate(gpu_ids):
+        env = os.environ.copy()
+        env["CUDA_VISIBLE_DEVICES"] = gpu_id
+        command = build_child_command(args, shard_id, len(gpu_ids), shard_outputs[shard_id])
+        process = subprocess.Popen(
+            command,
+            cwd=Path.cwd(),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        processes.append((shard_id, gpu_id, shard_outputs[shard_id], process))
+        print(f"started shard {shard_id}/{len(gpu_ids) - 1} on gpu {gpu_id}: {shard_outputs[shard_id].as_posix()}")
+
+    failed_logs: list[str] = []
+    for shard_id, gpu_id, shard_output, process in processes:
+        stdout, _ = process.communicate()
+        if process.returncode != 0:
+            failed_logs.append(
+                f"[shard {shard_id} gpu {gpu_id}] command failed with code {process.returncode}\n{stdout}"
+            )
+            continue
+        print(f"finished shard {shard_id}/{len(gpu_ids) - 1} on gpu {gpu_id}: {shard_output.as_posix()}")
+
+    if failed_logs:
+        raise RuntimeError("One or more shard jobs failed.\n\n" + "\n\n".join(failed_logs))
+
+    merged_output = merge_prediction_shards(shard_outputs, final_output)
+    remove_shard_outputs(shard_outputs)
+    print(f"merged {len(shard_outputs)} shards -> {merged_output.as_posix()}")
+    return merged_output
 
 
 def run_inference(args: argparse.Namespace) -> Path:
@@ -326,6 +592,7 @@ def run_inference(args: argparse.Namespace) -> Path:
         rows = load_jsonl(args.manifest)
         if args.limit is not None:
             rows = rows[: args.limit]
+        rows = apply_shard(rows, args.num_shards, args.shard_id)
         single_image = False
 
     output_path = args.output or default_output_path(
@@ -334,43 +601,67 @@ def run_inference(args: argparse.Namespace) -> Path:
         single_image,
         args.image,
         args.limit,
+        args.shard_id,
+        args.num_shards,
     )
+    per_image_dir = None
+    if args.per_image_format is not None:
+        per_image_dir = args.per_image_dir or default_per_image_dir(output_path, args.per_image_format)
+        per_image_dir.mkdir(parents=True, exist_ok=True)
 
     start_time = time.time()
-    model, tokenizer = load_model(args.base_model, args.adapter_dir, device, dtype)
-    image_processor = GOTImageEvalProcessor(image_size=1024)
+    existing_records = index_existing_records(output_path, args.overwrite)
+    rows_to_infer = [row for row in rows if row["sample_id"] not in existing_records]
+    model = None
+    tokenizer = None
+    image_processor = None
+    if rows_to_infer:
+        model, tokenizer = load_model(args.base_model, args.adapter_dir, device, dtype)
+        image_processor = GOTImageEvalProcessor(image_size=1024)
     records: list[dict[str, Any]] = []
 
-    for index, row in enumerate(rows, start=1):
-        image_path = Path(row["image_path"])
-        if args.backend == "official_chat":
-            prediction = infer_one_official(model, tokenizer, image_path)
+    row_iter = progress(
+        enumerate(rows, start=1),
+        desc=f"infer:{args.backend}:{args.query_mode}",
+        unit="sample",
+        disable=args.no_progress or single_image,
+    )
+    for index, row in row_iter:
+        existing_record = existing_records.get(row["sample_id"])
+        if existing_record is not None:
+            payload = existing_record
         else:
-            prediction = infer_one_local(
-                model=model,
-                tokenizer=tokenizer,
-                image_processor=image_processor,
+            if model is None or tokenizer is None or image_processor is None:
+                raise RuntimeError("Model was not loaded for a sample that requires inference.")
+            image_path = Path(row["image_path"])
+            if args.backend == "official_chat":
+                prediction = infer_one_official(model, tokenizer, image_path)
+            else:
+                prediction = infer_one_local(
+                    model=model,
+                    tokenizer=tokenizer,
+                    image_processor=image_processor,
+                    query=query,
+                    image_path=image_path,
+                    max_new_tokens=args.max_new_tokens,
+                )
+            payload = build_inference_payload(
+                index=index,
+                row=row,
+                prediction=prediction,
+                backend=args.backend,
+                query_mode=args.query_mode,
                 query=query,
-                image_path=image_path,
-                max_new_tokens=args.max_new_tokens,
+                device=device,
+                dtype=dtype,
+                single_image=single_image,
+                shard_id=args.shard_id,
+                num_shards=args.num_shards,
             )
-        payload = {
-            "index": index,
-            "sample_id": row["sample_id"],
-            "image_path": row["image_path"],
-            "prediction": prediction,
-            "backend": args.backend,
-            "query_mode": args.query_mode,
-            "query": query,
-            "device": device,
-            "dtype": str(dtype),
-        }
-        if "target_csv" in row:
-            payload["target_csv"] = row["target_csv"]
-        if "target_got_format" in row:
-            payload["target_got_format"] = row["target_got_format"]
         records.append(payload)
-        print(json.dumps({"index": index, "sample_id": row["sample_id"]}, ensure_ascii=False))
+        if per_image_dir is not None:
+            per_image_path = per_image_dir / f"{per_image_file_stem(payload)}.{per_image_extension(args.per_image_format)}"
+            per_image_path.write_text(format_per_image_prediction(payload["prediction"], args.per_image_format), encoding="utf-8")
 
     elapsed = round(time.time() - start_time, 3)
     if single_image:
@@ -378,7 +669,7 @@ def run_inference(args: argparse.Namespace) -> Path:
         payload["elapsed_sec"] = elapsed
         write_json(output_path, payload)
     else:
-        write_jsonl(output_path, records)
+        write_jsonl(output_path, merge_records_preserving_existing(existing_records, records))
     return output_path
 
 
@@ -397,11 +688,38 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-new-tokens", type=int, default=4096)
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--gpu-ids", type=str, help="Comma-separated GPU ids for multi-process multi-GPU manifest inference.")
+    parser.add_argument("--num-shards", type=int, help="Split manifest rows into this many stable shards.")
+    parser.add_argument("--shard-id", type=int, help="0-based shard id to run from the split manifest.")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--per-image-format", choices=("raw", "latex"), help="Additionally export each prediction as raw text or pretty-printed LaTeX.")
+    parser.add_argument("--per-image-dir", type=Path, help="Directory for per-image raw/latex exports. Defaults to a sibling directory derived from --output.")
+    parser.add_argument("--overwrite", action="store_true", help="Re-run inference even when the output JSONL already has a sample_id.")
+    parser.add_argument("--no-progress", action="store_true", help="Disable the default progress bar.")
     return parser
 
 
 def main() -> None:
     args = build_arg_parser().parse_args()
-    output_path = run_inference(args)
+    if args.image is not None and (args.num_shards is not None or args.shard_id is not None):
+        raise ValueError("--num-shards/--shard-id are only supported with --manifest.")
+    if args.gpu_ids is not None:
+        output_path = run_multi_gpu_inference(args)
+    else:
+        output_path = run_inference(args)
     print(output_path.as_posix())
+
+
+def merge_prediction_shards(input_paths: list[Path], output_path: Path) -> Path:
+    seen: set[str] = set()
+    rows: list[dict[str, Any]] = []
+    for path in input_paths:
+        for row in load_jsonl(path):
+            sample_id = row["sample_id"]
+            if sample_id in seen:
+                raise ValueError(f"Duplicate sample_id while merging shards: {sample_id}")
+            seen.add(sample_id)
+            rows.append(row)
+    rows.sort(key=lambda row: row["sample_id"])
+    write_jsonl(output_path, rows)
+    return output_path

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from yearbook_ocr.common.progress import progress
 from yearbook_ocr.data.real_flow import (
     apply_bottom_buffer,
     fallback_cut_y_from_lines,
@@ -178,6 +179,7 @@ def main() -> None:
         default=None,
         help="Optional directory for saving the OCR ROI images used to detect statistics anchors.",
     )
+    parser.add_argument("--no-progress", action="store_true", help="Disable the default progress bar.")
     args = parser.parse_args()
 
     ocr_engine = None
@@ -194,7 +196,12 @@ def main() -> None:
     if args.limit is not None:
         image_paths = image_paths[: args.limit]
 
-    for image_path in image_paths:
+    for image_path in progress(
+        image_paths,
+        desc="crop_daily",
+        unit="image",
+        disable=args.no_progress,
+    ):
         try:
             records.append(
                 crop_daily_region(

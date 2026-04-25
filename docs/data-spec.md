@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document defines the v0 data contract for the fixed-layout flow-table benchmark.
+This document defines the current data contract for the fixed-layout flow-table benchmark.
 
 The repository currently tracks two related output contracts:
 - label contract: calibrated CSV remains the source-of-truth representation
@@ -30,9 +30,14 @@ Each synthetic manifest row must include:
 
 `source` is `synthetic` for training and validation data.
 
+The current v1 synthetic manifest split is a strict seeded shuffle split:
+- generation command: `--num-samples 10000 --val-ratio 0.2 --seed 20260408 --num-workers 16`
+- train records: `8000`
+- validation records: `2000`
+
 ## Real Test Dataset
 
-Real flow tables are test-only in v0.
+Real flow tables are test-only in the current benchmark.
 
 The current aligned real test manifest stores:
 - `sample_id`
@@ -51,6 +56,7 @@ The current aligned real test manifest stores:
 - `source`
 
 `source` is `real` and `split` is always `test`.
+The current aligned real flow test manifest contains `35` records.
 
 The current official real-test image set for `2006 流量` is `station_tables_daily/`, which is produced by the OCR-based daily-only crop path.
 The same OCR-based daily-only crop path is also validated for `2014 水位`, but no aligned manifest exists for it yet because calibrated CSV labels are not present in the repository.
@@ -61,9 +67,12 @@ The current aligned manifest is produced by:
 
 ## Output Rules
 
-- `target_csv` preserves the calibrated table label exactly.
-- `target_got_format` is deterministically derived from `target_csv`.
-- Empty rows and empty cells are preserved when deriving either representation.
+- Raw calibrated CSV files remain the source-of-truth labels and are referenced by `csv_path` in real-test manifests.
+- Manifest `target_csv` is derived from the label rows after removing only fully empty separator rows.
+- Manifest `target_got_format` is deterministically derived from the same cleaned target rows.
+- Empty cells inside otherwise non-empty rows are preserved.
+- Natural calendar blanks and labeled missing values are preserved.
+- Fully empty separator rows are omitted from manifest targets, even when they remain visible in rendered images.
 - Number formats are preserved exactly as generated or labeled.
 - The current `ms-swift` GOT training path defaults to:
   - prompt: `OCR with format: `

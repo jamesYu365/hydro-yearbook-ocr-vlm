@@ -6,7 +6,7 @@ A repository for fine-tuning and evaluating vision-language models on hydrologic
 
 ## Overview
 
-This project targets OCR on hydrological yearbook flow tables. The current v0 training and evaluation scope is intentionally narrow: one fixed flow-table layout, one model family, one task contract.
+This project targets OCR on hydrological yearbook flow tables. The current v1 training and evaluation scope is intentionally narrow: one fixed flow-table layout, one model family, one task contract.
 
 The current repository tracks two related task views:
 - label authority: calibrated CSV remains the source-of-truth representation
@@ -21,12 +21,13 @@ The current baseline direction is:
 
 ## Current Scope
 
-Current v0 decisions:
+Current v1 decisions:
 - focus on `流量` only
-- keep `水位` out of the v0 training and final-evaluation scope
+- keep `水位` out of the current training and final-evaluation scope
 - use one fixed flow-table layout
 - render synthetic tables programmatically instead of reusing real screenshots
 - preserve natural calendar blanks and a small amount of missing values
+- omit fully empty separator rows from manifest targets while keeping them in rendered images
 - prioritize geometric and lighting perturbations
 - use `ms-swift + LoRA` as the preferred training path
 
@@ -36,7 +37,7 @@ Repository status as of 2026-04-24:
 - source PDFs and calibrated CSV labels are stored under `datasets/`
 - calibrated CSV files are treated as source-of-truth labels
 - the main documentation set under `docs/` is in place
-- v0 synthetic data generation is implemented and smoke-tested
+- v1 synthetic data generation is implemented with real-crop-like proportions, diagonal day/month header rendering, and strict shuffle split
 - real flow test manifest generation is implemented and smoke-tested
 - real PDF page rendering and layout-based station-table extraction are implemented
 - title-aware real-test extraction with `plain`, `buffered`, and `title_rois` outputs is implemented
@@ -51,13 +52,15 @@ Repository status as of 2026-04-24:
 - a Linux environment setup script is included
 - a `swift sft` wrapper for `GOT-OCR2.0` is included and validated on a smoke run
 - small sample outputs and manifest previews already exist under `data/`
-- `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_strict_csv.py` passes with `21 passed`
+- focused data, manifest, inference, and evaluation test suites pass in `got`
 - a GOT-OCR2.0 LoRA smoke run already succeeded with `sdpa`
-- a single-GPU baseline training run produced reusable checkpoints under `outputs/got_ocr2_v0_single/`
+- current v1 Swift manifests contain `8000` train records and `2000` validation records
+- the aligned real flow test manifest contains `35` records
 
 Still missing:
-- a durable full multi-GPU `GOT-OCR2.0` LoRA training route on this machine
-- a full formal benchmark report comparing base GOT vs fine-tuned GOT on the real extracted flow test set
+- a fresh `GOT-OCR2.0` LoRA run on the v1 synthetic manifests
+- fresh base and fine-tuned inference runs on the real extracted flow test set
+- a formal benchmark report comparing base GOT vs the v1 fine-tuned GOT model
 
 ## Verified Stable Path
 
@@ -76,8 +79,8 @@ Known environment findings from the validated smoke run:
 ## Data Snapshot
 
 Data notes:
-- `datasets/流量/` contains the current v0 target data
-- `datasets/水位/` is present and has validated real-table extraction and daily crop outputs, but it is still out of scope for the v0 model benchmark
+- `datasets/流量/` contains the current target data
+- `datasets/水位/` is present and has validated real-table extraction and daily crop outputs, but it is still out of scope for the current model benchmark
 - `datasets/derived/` stores generated real-test extraction outputs
 - extracted real-test images now use the form `稳定ID_标题_年份`
 - `station_tables_daily/` is the current official OCR-cropped real-test image set for `2006 流量`
@@ -109,7 +112,7 @@ Data notes:
 Use the Linux `got` conda environment for this project.
 
 1. Read [docs/project-overview.md](docs/project-overview.md)
-2. Review the v0 data contract in [docs/data-spec.md](docs/data-spec.md)
+2. Review the current data contract in [docs/data-spec.md](docs/data-spec.md)
 3. Check environment requirements in [docs/environment-setup.md](docs/environment-setup.md)
 4. Inspect the calibrated CSV labels under `datasets/流量/2006/`
 5. Review real-test extraction in [docs/real-test-extraction.md](docs/real-test-extraction.md)
@@ -120,21 +123,21 @@ Representative commands:
 conda run -n rapid python ./datasets/crop_flow_table_daily_region.py
 conda run -n rapid python ./datasets/run_ocr_on_image.py 'datasets/derived/debug_rois/2014_水位/page_0004_table1_汉江汉川站_2014.jpg' --ocr-cuda off
 python3 ./datasets/build_real_flow_alignment.py
-python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000
+python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000 --val-ratio 0.2 --seed 20260408 --num-workers 16
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl
 python3 ./scripts/models/got_ocr2/run_inference.py --manifest data/manifests/flow_real_test_aligned.jsonl --limit 5 --backend official_chat --query-mode official_format
-python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/got_ocr2_v0.jsonl --output outputs/reports/got_ocr2_v0_eval.json
+python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/got_ocr2_base/eval/checkpoint-0/flow_real_first5_official_chat.jsonl --output outputs/reports/got_ocr2_base_first5_eval.json
 ```
 
-These scripts are implemented, but they require a suitable Python 3.10+ environment and the training stack is not yet validated end to end on this machine.
-These scripts are implemented. The current machine has already passed data-prep, tests, and a 1-step GOT-OCR2.0 LoRA smoke run in the `got` environment.
+These scripts are implemented. The current machine has already passed data-prep, focused tests, and a 1-step GOT-OCR2.0 LoRA smoke run in the `got` environment.
 
 ## Roadmap
 
 Near-term execution order:
-- launch the first full `GOT-OCR2.0` LoRA fine-tuning run
-- evaluate on the real flow test set with strict raw-output scoring
+- train `GOT-OCR2.0` LoRA from the v1 synthetic Swift manifests
+- rerun base and fine-tuned inference on the aligned real flow test set
+- run model comparison and strict CSV-compatible reports where the prediction target supports them
 - inspect representative failure cases and decide the next iteration
 
 ## Documentation

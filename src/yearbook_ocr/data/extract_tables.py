@@ -10,8 +10,8 @@ from typing import Any
 import cv2
 import fitz
 from rapid_table_det.inference import TableDetector
-from tqdm import tqdm
 
+from yearbook_ocr.common.progress import progress
 from yearbook_ocr.ocr.rapidocr_paddle import init_paddle_ocr_engine, run_paddle_ocr
 
 DEFAULT_PDFS = [
@@ -90,6 +90,7 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="Physical GPU id to expose to Paddle. The script remaps this card to gpu:0 inside the process.",
     )
+    parser.add_argument("--no-progress", action="store_true", help="Disable the default progress bar.")
     return parser.parse_args()
 
 
@@ -492,6 +493,7 @@ def process_pdf(
     skip_existing_crops: bool,
     title_buffer_px: int,
     title_bottom_buffer_px: int,
+    no_progress: bool,
 ) -> dict[str, Any]:
     pdf_key = sanitize_stem(pdf_path.stem)
     year = extract_year_from_pdf_key(pdf_key)
@@ -520,7 +522,10 @@ def process_pdf(
         f"Start PDF {pdf_path.name}: {len(rendered_pages)} page(s), year={year}, top_buffer={title_buffer_px}, bottom_buffer={title_bottom_buffer_px}"
     )
 
-    for page_number, page_path in enumerate(tqdm(rendered_pages, desc=f"{pdf_path.stem}", unit="page"), start=1):
+    for page_number, page_path in enumerate(
+        progress(rendered_pages, desc=f"{pdf_path.stem}", unit="page", disable=no_progress),
+        start=1,
+    ):
         log_info(f"Process page {page_number}/{len(rendered_pages)} -> {page_path.name}")
         try:
             page_record, page_failures = crop_tables_from_page(
@@ -640,6 +645,7 @@ def main() -> None:
             skip_existing_crops=args.skip_existing_crops,
             title_buffer_px=args.title_buffer_px,
             title_bottom_buffer_px=args.title_bottom_buffer_px,
+            no_progress=args.no_progress,
         )
         summaries.append(summary)
         log_info(f"PDF summary: {json.dumps(summary, ensure_ascii=False)}")

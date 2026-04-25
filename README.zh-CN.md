@@ -6,7 +6,7 @@
 
 ## 项目概览
 
-本项目聚焦水文年鉴流量表 OCR。当前 v0 的训练与评测范围刻意收窄，只做一个固定流量表版式、一个模型方向、一个输出契约。
+本项目聚焦水文年鉴流量表 OCR。当前 v1 的训练与评测范围刻意收窄，只做一个固定流量表版式、一个模型方向、一个输出契约。
 
 当前仓库同时维护两层任务表示：
 - 标签权威层：人工校准 CSV 仍然是 source-of-truth
@@ -21,12 +21,13 @@
 
 ## 当前范围
 
-当前 v0 已固定的方案：
+当前 v1 已固定的方案：
 - 只做 `流量`
-- `水位` 不进入 v0 的训练和最终评测范围
+- `水位` 不进入当前训练和最终评测范围
 - 只做一种固定流量表版式
 - 合成表格程序绘制，不复用真实截图
 - 保留自然日历空位和少量缺测值
+- manifest 目标会删除整行全空的分隔行，但渲染图像中仍保留这些空白分隔行
 - 扰动以几何和光照为主
 - 训练优先采用 `ms-swift + LoRA`
 
@@ -36,7 +37,7 @@
 - 原始 PDF 和人工校准 CSV 位于 `datasets/`
 - 已将校准 CSV 作为 source-of-truth 标签
 - `docs/` 下的主文档已补齐
-- v0 合成数据生成已实现并通过 smoke test
+- v1 合成数据生成已实现，采用接近真实裁切图的横版比例、斜线日/月表头和严格 shuffle split
 - 真实流量测试 manifest 构建已实现并通过 smoke test
 - 真实 `2006 流量` 表的 OCR 日值裁切已实现
 - 已实现从真实日值裁切图到校准 CSV 的打分对齐
@@ -49,13 +50,15 @@
 - Linux 环境安装脚本已提供
 - `swift sft` 训练包装脚本已提供，并已完成 smoke run 验证
 - `data/` 下已有小规模样本与 manifest 预览产物
-- `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_strict_csv.py` 当前结果为 `21 passed`
+- `got` 环境中的数据、manifest、推理和评测相关 focused suites 当前通过
 - 一次基于 `sdpa` 的 GOT-OCR2.0 LoRA smoke training 已经跑通
-- 单卡基线训练已经产出可复用 checkpoint，位于 `outputs/got_ocr2_v0_single/`
+- 当前 v1 Swift manifest 规模为 `8000` 条训练记录和 `2000` 条验证记录
+- 已对齐的真实流量测试 manifest 含 `35` 条记录
 
 当前仍未完成：
-- 在当前机器上收敛一条稳定的多卡 `GOT-OCR2.0` LoRA 训练路径
-- 产出一份正式的真实流量测试对比报告，比较 base GOT 与微调 GOT
+- 基于 v1 synthetic manifest 重新训练 `GOT-OCR2.0` LoRA
+- 在真实流量测试集上重新跑 base 和微调模型推理
+- 产出一份正式的真实流量测试对比报告，比较 base GOT 与 v1 微调 GOT
 
 ## 当前稳定路径
 
@@ -74,8 +77,8 @@
 ## 数据快照
 
 数据说明：
-- `datasets/流量/` 是当前 v0 主目标数据
-- `datasets/水位/` 已存在，并已完成真实表格抽取与日值裁切，但暂不进入 v0 模型基准
+- `datasets/流量/` 是当前主目标数据
+- `datasets/水位/` 已存在，并已完成真实表格抽取与日值裁切，但暂不进入当前模型基准
 - `datasets/derived/` 下的 `station_tables_daily/` 是当前 `2006 流量` 正式真实测试图像集
 - 同样的 `station_tables_daily/` 产物也已生成到 `2014 水位`
 - 部分 CSV 使用本地中文编码而非 UTF-8
@@ -105,7 +108,7 @@
 本项目当前使用 Linux 下的 `got` conda 环境。
 
 1. 阅读 [docs/project-overview.md](docs/project-overview.md)
-2. 阅读 [docs/data-spec.md](docs/data-spec.md) 了解 v0 数据契约
+2. 阅读 [docs/data-spec.md](docs/data-spec.md) 了解当前数据契约
 3. 阅读 [docs/environment-setup.md](docs/environment-setup.md) 了解环境要求
 4. 查看 `datasets/流量/2006/` 下的校准 CSV
 
@@ -115,11 +118,11 @@
 conda run -n rapid python ./datasets/crop_flow_table_daily_region.py
 conda run -n rapid python ./datasets/run_ocr_on_image.py 'datasets/derived/debug_rois/2014_水位/page_0004_table1_汉江汉川站_2014.jpg' --ocr-cuda off
 python3 ./datasets/build_real_flow_alignment.py
-python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000
+python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000 --val-ratio 0.2 --seed 20260408 --num-workers 16
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl
 python3 ./scripts/models/got_ocr2/run_inference.py --manifest data/manifests/flow_real_test_aligned.jsonl --limit 5 --backend official_chat --query-mode official_format
-python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/got_ocr2_v0.jsonl --output outputs/reports/got_ocr2_v0_eval.json
+python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/got_ocr2_base/eval/checkpoint-0/flow_real_first5_official_chat.jsonl --output outputs/reports/got_ocr2_base_first5_eval.json
 ```
 
 这些脚本已经在仓库中实现，并且本机已在 `got` 环境中完成数据准备、测试和 1-step GOT-OCR2.0 LoRA smoke run 验证。
@@ -127,8 +130,9 @@ python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/predictions/
 ## 路线图
 
 近期执行顺序：
-- 启动第一轮完整的 `GOT-OCR2.0` LoRA 微调
-- 在真实流量测试集上完成严格评测
+- 基于 v1 synthetic Swift manifest 训练 `GOT-OCR2.0` LoRA
+- 在已对齐真实流量测试集上重新跑 base 和微调模型推理
+- 在目标格式允许时运行模型对比与严格 CSV 兼容评测
 - 基于代表性失败案例决定下一轮迭代
 
 ## 文档
