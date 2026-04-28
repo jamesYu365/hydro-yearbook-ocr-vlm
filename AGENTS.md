@@ -7,6 +7,15 @@ This repository is for fine-tuning and evaluating a VLM on hydrological yearbook
 - [docs/project-overview.md](/home/yubin/py_prj/yearbook_VLM/docs/project-overview.md): internal project context and current data status
 - `datasets/`: source PDFs and calibrated CSV labels
 
+## Docs Index
+- [docs/data-spec.md](/home/yubin/py_prj/yearbook_VLM/docs/data-spec.md): manifest schema, target cleanup rules, label authority, and layout JSON contract
+- [docs/environment-setup.md](/home/yubin/py_prj/yearbook_VLM/docs/environment-setup.md): `got` and `rapid` environment setup, dependency notes, and verification commands
+- [docs/experiment-plan.md](/home/yubin/py_prj/yearbook_VLM/docs/experiment-plan.md): benchmark goal, fixed decisions, metrics, and current execution order
+- [docs/got-ocr2-finetune.md](/home/yubin/py_prj/yearbook_VLM/docs/got-ocr2-finetune.md): GOT-OCR2.0 Swift/LoRA training, inference, cache, and evaluation workflow
+- [docs/real-test-extraction.md](/home/yubin/py_prj/yearbook_VLM/docs/real-test-extraction.md): real PDF table extraction, daily crop generation, and alignment workflow
+- [docs/running_command.md](/home/yubin/py_prj/yearbook_VLM/docs/running_command.md): copy-ready commands for data generation, training, inference, evaluation, and git
+- [docs/synthetic-data.md](/home/yubin/py_prj/yearbook_VLM/docs/synthetic-data.md): synthetic rendering rules, v1/v2 generation settings, and data-regime notes
+
 ## Working Rules
 - Keep `AGENTS.md` minimal. Do not duplicate material that already belongs in `README.md` or `docs/`.
 - Add detailed specifications, data rules, and workflow notes under `docs/`.

@@ -111,7 +111,7 @@ Important environment findings from the verified smoke run:
 - Calibrated CSV files are the source-of-truth labels.
 - Existing CSV files may use local Chinese encodings rather than UTF-8.
 - Raw calibrated CSV files and filenames should be preserved.
-- Manifest targets remove fully empty separator rows but preserve empty cells inside non-empty rows and natural calendar blanks.
+- Manifest targets remove empty artifact rows and trailing empty artifact columns but preserve empty cells inside non-empty rows and natural calendar blanks.
 - Existing filenames encode station, year, and river context and should be preserved.
 
 ## Code Organization

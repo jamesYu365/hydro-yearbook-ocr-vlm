@@ -27,7 +27,7 @@ Current v1 decisions:
 - use one fixed flow-table layout
 - render synthetic tables programmatically instead of reusing real screenshots
 - preserve natural calendar blanks and a small amount of missing values
-- omit fully empty separator rows from manifest targets while keeping them in rendered images
+- omit empty artifact rows and trailing empty artifact columns from manifest targets while keeping source CSV files unchanged
 - prioritize geometric and lighting perturbations
 - use `ms-swift + LoRA` as the preferred training path
 

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from yearbook_ocr.common.jsonl import write_json, write_jsonl
-from yearbook_ocr.common.tabular import csv_rows_to_got_format, csv_rows_to_text, parse_csv_text, read_csv_text, remove_blank_rows
+from yearbook_ocr.common.tabular import csv_rows_to_got_format, csv_rows_to_text, normalize_target_rows, parse_csv_text, read_csv_text
 from yearbook_ocr.data.real_flow import parse_csv_entry, parse_image_entry, resolve_reciprocal_matches
 
 
@@ -22,7 +22,7 @@ def build_real_flow_alignment_manifest(
     for row in rows:
         csv_text, csv_encoding = read_csv_text(Path(row["csv_path"]))
         csv_rows = parse_csv_text(csv_text)
-        target_rows = remove_blank_rows(csv_rows)
+        target_rows = normalize_target_rows(csv_rows)
         manifest_rows.append(
             {
                 "sample_id": row["sample_id"],

@@ -1,3 +1,5 @@
+import csv
+
 import scripts.data.generate_synthetic_flow_v0 as generator
 from yearbook_ocr.common.progress import progress
 from yearbook_ocr.common.tabular import seeded_random
@@ -133,6 +135,7 @@ def test_manifest_record_can_be_rebuilt_from_existing_assets(tmp_path) -> None:
         0,
         20260408,
         "val",
+        "flow_v0",
         template_rows,
         pools,
         image_dir,
@@ -156,3 +159,74 @@ def test_build_split_map_uses_exact_shuffled_val_count() -> None:
     assert sum(1 for split in split_map.values() if split == "val") == 2000
     assert sum(1 for split in split_map.values() if split == "train") == 8000
     assert split_map == generator.build_split_map(num_samples=10000, val_ratio=0.2, seed=20260408)
+
+
+def test_zero_heavy_regime_produces_many_zeroes_and_keeps_calendar_blanks() -> None:
+    template_rows = [["日期"] + [f"m{i}" for i in range(12)]]
+    template_rows.extend([[str(day)] + ["1"] * 12 for day in range(1, 32)])
+    pools = {month_index: ["12.3", "45.6", "0"] for month_index in range(12)}
+
+    rows = generator.sample_table_rows(template_rows, pools, seeded_random(7), data_regime="zero_heavy")
+    target_rows = [row for row in rows if row and row[0] != "日期"]
+    zero_count = sum(cell == "0" for row in target_rows for cell in row[1:])
+
+    assert zero_count >= 250
+    assert rows[29][2] == ""
+    assert rows[30][2] == ""
+    assert rows[31][2] == ""
+    assert rows[31][4] == ""
+    assert rows[31][6] == ""
+    assert rows[31][9] == ""
+    assert rows[31][11] == ""
+
+
+def test_calendar_tail_focus_keeps_blank_vs_zero_distinction() -> None:
+    template_rows = [["日期"] + [f"m{i}" for i in range(12)]]
+    template_rows.extend([[str(day)] + ["1"] * 12 for day in range(1, 32)])
+    pools = {month_index: ["12.3", "45.6"] for month_index in range(12)}
+
+    rows = generator.sample_table_rows(template_rows, pools, seeded_random(3), data_regime="calendar_tail_focus")
+
+    assert rows[29][2] == ""
+    assert rows[30][2] == ""
+    assert rows[31][2] == ""
+    assert rows[31][4] == ""
+    assert rows[31][6] == ""
+    assert rows[31][9] == ""
+    assert rows[31][11] == ""
+    valid_tail_cells = [
+        rows[day][month_index + 1]
+        for day in (29, 30, 31)
+        for month_index in range(12)
+        if day <= generator.month_day_limit(month_index)
+    ]
+    assert "0" in valid_tail_cells
+    assert "" not in valid_tail_cells
+
+
+def test_build_sample_payload_records_dataset_version_and_data_regime(tmp_path) -> None:
+    template_rows = [["日期"] + [f"m{i}" for i in range(12)]]
+    template_rows.extend([[str(day)] + ["1"] * 12 for day in range(1, 32)])
+    pools = {month_index: ["12.3", "45.6", "0"] for month_index in range(12)}
+    font_path = generator.resolve_font_path(None)
+
+    split, record = generator.build_sample_payload(
+        0,
+        20260428,
+        "train",
+        "flow_v2",
+        template_rows,
+        pools,
+        font_path,
+        generator.font_display_name(font_path),
+        generator.DEFAULT_RENDER_CONFIG,
+        tmp_path / "images",
+        tmp_path / "layouts",
+    )
+
+    assert split == "train"
+    assert record["image_path"].endswith("flow_v2_00000.png")
+    assert record["data_regime"] in generator.VALID_DATA_REGIMES
+    target_rows = list(csv.reader(record["target_csv"].splitlines()))
+    assert len(target_rows) == 32
+    assert max(len(row) for row in target_rows) == 13

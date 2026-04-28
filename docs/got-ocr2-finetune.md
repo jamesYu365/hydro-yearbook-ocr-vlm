@@ -71,7 +71,7 @@ The current default manifest conversion path uses:
 - `query`: official GOT format prompt
 - `response`: `target_got_format`
 
-The calibrated CSV label is still retained alongside the manifest source rows as `target_csv`. Manifest targets remove fully empty separator rows while preserving empty cells inside data rows and natural calendar blanks.
+The calibrated CSV label is still retained alongside the manifest source rows as `target_csv`. Manifest targets remove empty artifact rows and trailing empty artifact columns while preserving empty cells inside data rows and natural calendar blanks.
 
 ## Training Procedure
 

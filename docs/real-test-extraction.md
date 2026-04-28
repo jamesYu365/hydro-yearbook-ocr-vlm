@@ -165,7 +165,7 @@ After extraction, the next dataset task is:
 - align cropped station-table images with the calibrated CSV labels when those labels exist
 - build the real final-test inference manifest from those aligned pairs
 
-For the aligned real-test manifest, `csv_path` points to the original calibrated CSV file. The manifest `target_csv` and `target_got_format` are derived from that CSV after removing only fully empty separator rows; crop generation and source CSV files are unchanged.
+For the aligned real-test manifest, `csv_path` points to the original calibrated CSV file. The manifest `target_csv` and `target_got_format` are derived from that CSV after removing empty artifact rows and trailing empty artifact columns; crop generation and source CSV files are unchanged.
 
 Current helper commands for that step:
 

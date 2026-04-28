@@ -24,6 +24,7 @@ Each synthetic manifest row must include:
 - `target_got_format`
 - `layout_json_path`
 - `perturbations`
+- `data_regime`
 - `source_template_id`
 - `split`
 - `source`
@@ -34,6 +35,8 @@ The current v1 synthetic manifest split is a strict seeded shuffle split:
 - generation command: `--num-samples 10000 --val-ratio 0.2 --seed 20260408 --num-workers 16`
 - train records: `8000`
 - validation records: `2000`
+
+For the v2 synthetic loop, use `--dataset-version flow_v2`, `--output-dir data/flow_v2`, and `--manifest-dir data/manifests/flow_v2`. The v2 manifest keeps the same row contract and uses `data_regime` to identify normal, zero-heavy, zero-with-spikes, and calendar-tail-focus samples.
 
 ## Real Test Dataset
 
@@ -68,11 +71,11 @@ The current aligned manifest is produced by:
 ## Output Rules
 
 - Raw calibrated CSV files remain the source-of-truth labels and are referenced by `csv_path` in real-test manifests.
-- Manifest `target_csv` is derived from the label rows after removing only fully empty separator rows.
+- Manifest `target_csv` is derived from the label rows after removing empty artifact rows and trailing empty artifact columns.
 - Manifest `target_got_format` is deterministically derived from the same cleaned target rows.
 - Empty cells inside otherwise non-empty rows are preserved.
 - Natural calendar blanks and labeled missing values are preserved.
-- Fully empty separator rows are omitted from manifest targets, even when they remain visible in rendered images.
+- Empty separator rows and trailing empty CSV-export columns are omitted from manifest targets, even when they remain visible in rendered images or source CSV files.
 - Number formats are preserved exactly as generated or labeled.
 - The current `ms-swift` GOT training path defaults to:
   - prompt: `OCR with format: `
@@ -87,6 +90,8 @@ Each layout JSON must include:
 - `table_meta`
 - `cells`
 - `perturbations`
+
+For synthetic samples, `table_meta` also stores the `data_regime` used to generate the table.
 
 Each cell record should include:
 - `row_index`

@@ -33,7 +33,7 @@ Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evalu
 - the real test manifest has been built with 35 records
 - v1 `train_swift.jsonl` and `val_swift.jsonl` have been built with `8000` train records and `2000` validation records
 - a 1-step GOT-OCR2.0 LoRA smoke run has passed with `sdpa`
-- the v1 synthetic targets remove fully empty separator rows while preserving empty cells inside data rows
+- the v1 targets remove empty artifact rows and trailing empty artifact columns while preserving empty cells inside data rows
 
 ## Metrics
 

@@ -11,7 +11,7 @@ CSV_ENCODINGS = ("utf-8-sig", "utf-8", "gb18030", "gbk")
 DEFAULT_PROMPT = (
     "Read the table in the image and output only CSV text.\n"
     "Keep the original comma-separated structure.\n"
-    "Omit fully empty separator rows, but keep empty cells inside data rows.\n"
+    "Omit empty artifact rows and trailing empty artifact columns, but keep empty cells inside data rows.\n"
     "Do not add explanations, titles, markdown fences, or extra text.\n"
     "Do not normalize number formats.\n"
     "Do not fill in missing values."
@@ -52,6 +52,33 @@ def csv_rows_to_text(rows: Iterable[Iterable[str]]) -> str:
 
 def remove_blank_rows(rows: Iterable[Iterable[str]]) -> list[list[str]]:
     return [list(row) for row in rows if not is_blank_row([str(cell) for cell in row])]
+
+
+def is_empty_artifact_cell(cell: str) -> bool:
+    return cell.strip() in {"", "."}
+
+
+def is_empty_artifact_row(row: list[str]) -> bool:
+    return all(is_empty_artifact_cell(str(cell)) for cell in row)
+
+
+def remove_empty_artifact_rows(rows: Iterable[Iterable[str]]) -> list[list[str]]:
+    return [list(row) for row in rows if not is_empty_artifact_row([str(cell) for cell in row])]
+
+
+def trim_trailing_empty_artifact_columns(rows: Iterable[Iterable[str]]) -> list[list[str]]:
+    normalized_rows = [[str(cell) for cell in row] for row in rows]
+    if not normalized_rows:
+        return []
+    width = max(len(row) for row in normalized_rows)
+    padded_rows = [row + [""] * (width - len(row)) for row in normalized_rows]
+    while width > 0 and all(is_empty_artifact_cell(row[width - 1]) for row in padded_rows):
+        width -= 1
+    return [row[:width] for row in padded_rows]
+
+
+def normalize_target_rows(rows: Iterable[Iterable[str]]) -> list[list[str]]:
+    return trim_trailing_empty_artifact_columns(remove_empty_artifact_rows(rows))
 
 
 def csv_rows_to_got_format(rows: Iterable[Iterable[str]]) -> str:

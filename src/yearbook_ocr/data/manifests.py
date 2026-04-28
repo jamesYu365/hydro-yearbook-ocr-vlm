@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from yearbook_ocr.common.jsonl import load_jsonl, write_jsonl
-from yearbook_ocr.common.tabular import DEFAULT_GOT_FORMAT_PROMPT, csv_rows_to_got_format, parse_csv_text, remove_blank_rows
+from yearbook_ocr.common.tabular import DEFAULT_GOT_FORMAT_PROMPT, csv_rows_to_got_format, normalize_target_rows, parse_csv_text
 
 
 def backfill_got_format_manifest(path: Path) -> int:
@@ -11,7 +11,7 @@ def backfill_got_format_manifest(path: Path) -> int:
     updated = 0
     for record in rows:
         if "target_csv" in record and "target_got_format" not in record:
-            record["target_got_format"] = csv_rows_to_got_format(remove_blank_rows(parse_csv_text(record["target_csv"])))
+            record["target_got_format"] = csv_rows_to_got_format(normalize_target_rows(parse_csv_text(record["target_csv"])))
             updated += 1
     write_jsonl(path, rows)
     return updated
@@ -25,7 +25,7 @@ def convert_swift_manifest_to_got_format(path: Path, prompt: str = DEFAULT_GOT_F
         if csv_text is None:
             raise KeyError(f"Missing response in {path}")
         record["query"] = f"<image>{prompt}"
-        record["response"] = csv_rows_to_got_format(remove_blank_rows(parse_csv_text(csv_text)))
+        record["response"] = csv_rows_to_got_format(normalize_target_rows(parse_csv_text(csv_text)))
         updated += 1
     write_jsonl(path, rows)
     return updated

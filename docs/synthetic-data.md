@@ -35,7 +35,7 @@ The top-left header cell is rendered visually as a diagonal day/month header. Th
 - Randomly blanking valid dates is not part of the current data contract.
 - A small amount of missing values in data cells is allowed.
 - Blank separator rows remain in the rendered image and layout JSON.
-- Manifest targets remove only fully empty separator rows.
+- Manifest targets remove empty artifact rows and trailing empty artifact columns.
 - Empty cells inside non-empty data rows remain in both `target_csv` and `target_got_format`.
 
 ## Perturbation Rules
@@ -88,3 +88,32 @@ Operational notes:
 - `--num-workers` parallelizes image and layout generation.
 - `--manifest-only` rebuilds `train.jsonl` and `val.jsonl` from existing images and layouts without rewriting those assets.
 - the train/validation split is a strict seeded shuffle split, not a contiguous index split.
+
+## v2 Direction
+
+The next synthetic dataset version targets the current real-test failure modes:
+- blank-vs-literal-`0` confusion
+- zero-heavy station tables
+- calendar-tail rows `29`, `30`, and `31`
+
+Recommended v2 generation command:
+
+```bash
+conda run --no-capture-output -n got python scripts/data/generate_synthetic_flow_v0.py \
+  --dataset-dir datasets/流量/2006 \
+  --output-dir data/flow_v2 \
+  --manifest-dir data/manifests/flow_v2 \
+  --dataset-version flow_v2 \
+  --num-samples 8000 \
+  --val-ratio 0.2 \
+  --seed 20260428 \
+  --num-workers 16
+```
+
+The v2 generator records `data_regime` in each manifest row and layout JSON. The current regime mix is:
+- `normal`: 45%
+- `zero_heavy`: 25%
+- `zero_with_spikes`: 15%
+- `calendar_tail_focus`: 15%
+
+`flow_v0` generation keeps the legacy normal sampling profile for reproducibility. The hard-regime mix is activated by using a new dataset version such as `flow_v2`.

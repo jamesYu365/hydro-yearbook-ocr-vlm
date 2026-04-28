@@ -25,7 +25,7 @@ from yearbook_ocr.common.tabular import (
     month_day_limit,
     parse_csv_text,
     read_csv_text,
-    remove_blank_rows,
+    normalize_target_rows,
     sample_id_from_name,
     seeded_random,
 )
@@ -57,6 +57,13 @@ class RenderConfig:
 
 
 DEFAULT_RENDER_CONFIG = RenderConfig()
+DATA_REGIME_WEIGHTS = (
+    ("normal", 45),
+    ("zero_heavy", 25),
+    ("zero_with_spikes", 15),
+    ("calendar_tail_focus", 15),
+)
+VALID_DATA_REGIMES = tuple(regime for regime, _ in DATA_REGIME_WEIGHTS)
 
 
 def resolve_font_path(font_path: Path | None) -> Path:
@@ -103,7 +110,71 @@ def build_numeric_pools(dataset_dir: Path) -> dict[int, list[str]]:
     return dict(pools)
 
 
-def sample_table_rows(template_rows: list[list[str]], pools: dict[int, list[str]], rng) -> list[list[str]]:
+def select_data_regime(rng) -> str:
+    draw = rng.uniform(0, sum(weight for _, weight in DATA_REGIME_WEIGHTS))
+    cumulative = 0.0
+    for regime, weight in DATA_REGIME_WEIGHTS:
+        cumulative += weight
+        if draw <= cumulative:
+            return regime
+    return DATA_REGIME_WEIGHTS[-1][0]
+
+
+def select_data_regime_for_version(rng, dataset_version: str) -> str:
+    if dataset_version == "flow_v0":
+        return "normal"
+    return select_data_regime(rng)
+
+
+def sample_pool_value(pools: dict[int, list[str]], month_index: int, rng) -> str:
+    month_pool = pools[month_index]
+    return rng.choice(month_pool) if month_pool else "0"
+
+
+def sample_spike_value(pools: dict[int, list[str]], month_index: int, rng) -> str:
+    spike_pool = [value for value in pools.get(month_index, []) if is_valid_numeric_token(value) and float(value) >= 20]
+    return rng.choice(spike_pool) if spike_pool else sample_pool_value(pools, month_index, rng)
+
+
+def sample_regime_value(
+    day: int,
+    month_index: int,
+    pools: dict[int, list[str]],
+    rng,
+    data_regime: str,
+    zero_months: set[int],
+    spike_months: set[int],
+) -> str:
+    if data_regime == "normal":
+        value = sample_pool_value(pools, month_index, rng)
+        return "" if rng.random() < 0.005 else value
+    if data_regime == "zero_heavy":
+        zero_probability = 0.95 if month_index in zero_months else 0.65
+        return "0" if rng.random() < zero_probability else sample_pool_value(pools, month_index, rng)
+    if data_regime == "zero_with_spikes":
+        if month_index in zero_months:
+            return sample_spike_value(pools, month_index, rng) if rng.random() < 0.08 else "0"
+        if month_index in spike_months and rng.random() < 0.25:
+            return sample_spike_value(pools, month_index, rng)
+        return "0" if rng.random() < 0.55 else sample_pool_value(pools, month_index, rng)
+    if data_regime == "calendar_tail_focus":
+        if day >= 29:
+            return "0" if rng.random() < 0.65 else sample_pool_value(pools, month_index, rng)
+        return "0" if rng.random() < 0.20 else sample_pool_value(pools, month_index, rng)
+    raise ValueError(f"Unsupported data regime: {data_regime}")
+
+
+def sample_table_rows(
+    template_rows: list[list[str]],
+    pools: dict[int, list[str]],
+    rng,
+    data_regime: str = "normal",
+) -> list[list[str]]:
+    if data_regime not in VALID_DATA_REGIMES:
+        raise ValueError(f"Unsupported data regime: {data_regime}")
+    zero_month_count = rng.randint(6, 10) if data_regime in {"zero_heavy", "zero_with_spikes"} else 0
+    zero_months = set(rng.sample(range(12), k=zero_month_count)) if zero_month_count else set()
+    spike_months = set(rng.sample(range(12), k=rng.randint(1, 3))) if data_regime == "zero_with_spikes" else set()
     rows: list[list[str]] = []
     for row_index, row in enumerate(template_rows):
         if row_index == 0:
@@ -118,11 +189,17 @@ def sample_table_rows(template_rows: list[list[str]], pools: dict[int, list[str]
             if day > month_day_limit(month_index):
                 new_row.append("")
                 continue
-            month_pool = pools[month_index]
-            value = rng.choice(month_pool) if month_pool else "0"
-            if rng.random() < 0.005:
-                value = ""
-            new_row.append(value)
+            new_row.append(
+                sample_regime_value(
+                    day=day,
+                    month_index=month_index,
+                    pools=pools,
+                    rng=rng,
+                    data_regime=data_regime,
+                    zero_months=zero_months,
+                    spike_months=spike_months,
+                )
+            )
         rows.append(new_row)
     return rows
 
@@ -345,6 +422,7 @@ def build_sample_payload(
     index: int,
     seed: int,
     split: str,
+    dataset_version: str,
     template_rows: list[list[str]],
     pools: dict[int, list[str]],
     font_path: Path,
@@ -354,14 +432,15 @@ def build_sample_payload(
     layout_dir: Path,
 ) -> tuple[str, dict[str, Any]]:
     rng = seeded_random(seed + index)
-    sample_rows = normalize_table_header(sample_table_rows(template_rows, pools, rng))
-    target_rows = remove_blank_rows(sample_rows)
+    data_regime = select_data_regime_for_version(rng, dataset_version)
+    sample_rows = normalize_table_header(sample_table_rows(template_rows, pools, rng, data_regime=data_regime))
+    target_rows = normalize_target_rows(sample_rows)
     sample_csv = csv_rows_to_text(target_rows)
     sample_got_format = csv_rows_to_got_format(target_rows)
     image, cells = render_table(sample_rows, font_path, rng, config=render_config)
     image, perturbations = apply_perturbations(image, rng)
 
-    sample_name = f"flow_v0_{index:05d}"
+    sample_name = f"{dataset_version}_{index:05d}"
     sample_id = sample_id_from_name(sample_name)
     image_path = image_dir / f"{sample_name}.png"
     layout_path = layout_dir / f"{sample_name}.json"
@@ -374,8 +453,9 @@ def build_sample_payload(
             "sample_id": sample_id,
             "image_path": str(image_path.as_posix()),
             "table_meta": {
-                "task": "flow_v0",
+                "task": dataset_version,
                 "layout_name": "fixed_flow_table",
+                "data_regime": data_regime,
                 "row_count": len(sample_rows),
                 "col_count": len(sample_rows[0]),
                 "font_path": font_path.as_posix(),
@@ -394,6 +474,7 @@ def build_sample_payload(
         "target_got_format": sample_got_format,
         "layout_json_path": str(layout_path.as_posix()),
         "perturbations": perturbations,
+        "data_regime": data_regime,
         "source_template_id": "fixed_flow_table",
         "split": split,
         "source": "synthetic",
@@ -416,18 +497,20 @@ def build_manifest_record_from_existing_assets(
     index: int,
     seed: int,
     split: str,
+    dataset_version: str,
     template_rows: list[list[str]],
     pools: dict[int, list[str]],
     image_dir: Path,
     layout_dir: Path,
 ) -> tuple[str, dict[str, Any]]:
     rng = seeded_random(seed + index)
-    sample_rows = normalize_table_header(sample_table_rows(template_rows, pools, rng))
-    target_rows = remove_blank_rows(sample_rows)
+    data_regime = select_data_regime_for_version(rng, dataset_version)
+    sample_rows = normalize_table_header(sample_table_rows(template_rows, pools, rng, data_regime=data_regime))
+    target_rows = normalize_target_rows(sample_rows)
     sample_csv = csv_rows_to_text(target_rows)
     sample_got_format = csv_rows_to_got_format(target_rows)
 
-    sample_name = f"flow_v0_{index:05d}"
+    sample_name = f"{dataset_version}_{index:05d}"
     sample_id = sample_id_from_name(sample_name)
     image_path = image_dir / f"{sample_name}.png"
     layout_path = layout_dir / f"{sample_name}.json"
@@ -444,6 +527,7 @@ def build_manifest_record_from_existing_assets(
         "target_got_format": sample_got_format,
         "layout_json_path": str(layout_path.as_posix()),
         "perturbations": perturbations,
+        "data_regime": data_regime,
         "source_template_id": "fixed_flow_table",
         "split": split,
         "source": "synthetic",
@@ -452,9 +536,11 @@ def build_manifest_record_from_existing_assets(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate v0 synthetic flow tables.")
+    parser = argparse.ArgumentParser(description="Generate synthetic flow tables.")
     parser.add_argument("--dataset-dir", type=Path, default=Path("datasets/流量/2006"))
     parser.add_argument("--output-dir", type=Path, default=Path("data/flow_v0"))
+    parser.add_argument("--manifest-dir", type=Path, default=Path("data/manifests/flow_v0"))
+    parser.add_argument("--dataset-version", type=str, default="flow_v0")
     parser.add_argument("--num-samples", type=int, default=10000)
     parser.add_argument("--val-ratio", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=20260408)
@@ -491,7 +577,7 @@ def main() -> None:
 
     image_dir = args.output_dir / "images"
     layout_dir = args.output_dir / "layouts"
-    manifest_dir = Path("data/manifests/flow_v0")
+    manifest_dir = args.manifest_dir
     train_manifest = manifest_dir / "train.jsonl"
     val_manifest = manifest_dir / "val.jsonl"
     if train_manifest.exists():
@@ -512,6 +598,7 @@ def main() -> None:
                 index,
                 args.seed,
                 split_map[index],
+                args.dataset_version,
                 template_rows,
                 pools,
                 image_dir,
@@ -528,6 +615,7 @@ def main() -> None:
             index,
             args.seed,
             split_map[index],
+            args.dataset_version,
             template_rows,
             pools,
             font_path,

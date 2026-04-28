@@ -2,6 +2,7 @@ from pathlib import Path
 
 from yearbook_ocr.common.tabular import (
     csv_rows_to_got_format,
+    normalize_target_rows,
     remove_blank_rows,
     month_day_limit,
     parse_station_meta,
@@ -53,3 +54,29 @@ def test_remove_blank_rows_keeps_empty_cells_inside_data_rows() -> None:
         ["1", "29.5", ""],
         ["2", "", "19.2"],
     ]
+
+
+def test_normalize_target_rows_trims_empty_artifact_edges() -> None:
+    rows = [
+        ["日期", "一月", "二月", ""],
+        ["1", "29.5", "", ""],
+        ["2", "", "19.2", ""],
+        ["", "", ".", ""],
+    ]
+
+    assert normalize_target_rows(rows) == [
+        ["日期", "一月", "二月"],
+        ["1", "29.5", ""],
+        ["2", "", "19.2"],
+    ]
+
+
+def test_normalize_target_rows_keeps_internal_empty_cells_and_zeroes() -> None:
+    rows = [
+        ["日期", "一月", "二月", "三月"],
+        ["29", "0", "", "12.4"],
+        ["30", "0", "", "10.4"],
+        ["31", "0", "", "9.8"],
+    ]
+
+    assert normalize_target_rows(rows) == rows
