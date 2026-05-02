@@ -17,7 +17,7 @@ The current baseline direction is:
 - training: synthetic data first
 - final test: real calibrated flow tables only
 - training target: official GOT `OCR with format:` output
-- evaluation: compare official-format predictions first; keep strict CSV scoring as a separate legacy-compatible metric
+- evaluation: score raw/pretty GOT table output with the shared table parser against CSV source-of-truth targets
 
 ## Current Scope
 
@@ -48,7 +48,7 @@ Repository status as of 2026-04-24:
 - `ms-swift` manifest conversion for `GOT-OCR2.0` is implemented and smoke-tested
 - a shared `src/yearbook_ocr/` package now holds stable data, OCR, inference, and evaluation logic
 - unified GOT inference now runs through `scripts/models/got_ocr2/run_inference.py`
-- strict CSV evaluation is implemented and covered by tests
+- table-format evaluation for raw GOT/LaTeX output is implemented and covered by tests
 - a Linux environment setup script is included
 - a `swift sft` wrapper for `GOT-OCR2.0` is included and validated on a smoke run
 - small sample outputs and manifest previews already exist under `data/`
@@ -127,7 +127,7 @@ python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000 --val-r
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl
 python3 ./scripts/models/got_ocr2/run_inference.py --manifest data/manifests/flow_real_test_aligned.jsonl --limit 5 --backend official_chat --query-mode official_format
-python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/got_ocr2_base/eval/checkpoint-0/flow_real_first5_official_chat.jsonl --output outputs/reports/got_ocr2_base_first5_eval.json
+python3 ./scripts/eval/evaluate_predictions.py --predictions outputs/got_ocr2_base/eval/checkpoint-0/flow_real_first5_official_chat.jsonl --output outputs/reports/got_ocr2_base_first5_eval.json
 ```
 
 These scripts are implemented. The current machine has already passed data-prep, focused tests, and a 1-step GOT-OCR2.0 LoRA smoke run in the `got` environment.
@@ -137,7 +137,7 @@ These scripts are implemented. The current machine has already passed data-prep,
 Near-term execution order:
 - train `GOT-OCR2.0` LoRA from the v1 synthetic Swift manifests
 - rerun base and fine-tuned inference on the aligned real flow test set
-- run model comparison and strict CSV-compatible reports where the prediction target supports them
+- run table-format evaluation and model comparison on raw/pretty GOT outputs
 - inspect representative failure cases and decide the next iteration
 
 ## Documentation

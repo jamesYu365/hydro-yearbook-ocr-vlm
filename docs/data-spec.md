@@ -80,7 +80,8 @@ The current aligned manifest is produced by:
 - The current `ms-swift` GOT training path defaults to:
   - prompt: `OCR with format: `
   - response field: `target_got_format`
-- Strict CSV evaluation remains available, but it should only be treated as a like-for-like metric when the prediction target is also CSV.
+- Current inference produces raw GOT or pretty LaTeX table text. The evaluator parses those prediction rows and compares
+  them to the manifest `target_csv` source-of-truth cells.
 
 ## Layout JSON
 

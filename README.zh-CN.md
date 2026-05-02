@@ -17,7 +17,7 @@
 - 训练：以高保真合成数据为主
 - 最终测试：只在真实已校准流量表上做
 - 训练目标：官方 `OCR with format:` 输出
-- 评测：优先比较官方格式目标，同时保留严格 CSV 评测作为兼容指标
+- 评测：用共享表格解析器评测 raw/pretty GOT 表格输出，并以 CSV source-of-truth 为目标
 
 ## 当前范围
 
@@ -46,7 +46,7 @@
 - 面向 `GOT-OCR2.0` 的 `ms-swift` manifest 转换已实现并通过 smoke test
 - 已建立共享核心包 `src/yearbook_ocr/`，承载稳定的数据、OCR、推理与评测逻辑
 - GOT 推理入口已统一到 `scripts/models/got_ocr2/run_inference.py`
-- 严格 CSV 评测脚本已实现，并有测试覆盖
+- 面向 raw GOT/LaTeX 输出的表格评测脚本已实现，并有测试覆盖
 - Linux 环境安装脚本已提供
 - `swift sft` 训练包装脚本已提供，并已完成 smoke run 验证
 - `data/` 下已有小规模样本与 manifest 预览产物
@@ -122,7 +122,7 @@ python3 ./scripts/data/generate_synthetic_flow_v0.py --num-samples 10000 --val-r
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/train.jsonl --output data/manifests/flow_v0/train_swift.jsonl
 python3 ./scripts/models/got_ocr2/build_swift_manifest.py --input data/manifests/flow_v0/val.jsonl --output data/manifests/flow_v0/val_swift.jsonl
 python3 ./scripts/models/got_ocr2/run_inference.py --manifest data/manifests/flow_real_test_aligned.jsonl --limit 5 --backend official_chat --query-mode official_format
-python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/got_ocr2_base/eval/checkpoint-0/flow_real_first5_official_chat.jsonl --output outputs/reports/got_ocr2_base_first5_eval.json
+python3 ./scripts/eval/evaluate_predictions.py --predictions outputs/got_ocr2_base/eval/checkpoint-0/flow_real_first5_official_chat.jsonl --output outputs/reports/got_ocr2_base_first5_eval.json
 ```
 
 这些脚本已经在仓库中实现，并且本机已在 `got` 环境中完成数据准备、测试和 1-step GOT-OCR2.0 LoRA smoke run 验证。
@@ -132,7 +132,7 @@ python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/got_ocr2_bas
 近期执行顺序：
 - 基于 v1 synthetic Swift manifest 训练 `GOT-OCR2.0` LoRA
 - 在已对齐真实流量测试集上重新跑 base 和微调模型推理
-- 在目标格式允许时运行模型对比与严格 CSV 兼容评测
+- 对 raw/pretty GOT 输出运行表格评测和模型对比
 - 基于代表性失败案例决定下一轮迭代
 
 ## 文档

@@ -38,7 +38,8 @@ conda run --no-capture-output -n got pytest -q \
   tests/test_flow_common.py \
   tests/test_backfill_got_format_targets.py \
   tests/test_real_flow_test_prep.py \
-  tests/test_evaluate_strict_csv.py \
+  tests/test_evaluate_predictions.py \
+  tests/test_output_classification.py \
   tests/test_generate_synthetic_flow_v0.py \
   tests/test_got_inference.py \
   tests/test_model_comparison.py
@@ -217,8 +218,8 @@ EVAL_BATCH_SIZE=1 \
 GRAD_ACC_STEPS=50 \
 ATTN_IMPL=sdpa \
 MAX_LENGTH=3072 \
-SAVE_STEPS=40 \
-EVAL_STEPS=40 \
+SAVE_STEPS=32 \
+EVAL_STEPS=32 \
 LOGGING_STEPS=5 \
 GRADIENT_CHECKPOINTING=true \
 GRADIENT_CHECKPOINTING_KWARGS='{"use_reentrant": false}' \
@@ -250,7 +251,7 @@ Base 模型全量真实测试推理：
 ```bash
 conda run --no-capture-output -n got python scripts/models/got_ocr2/run_inference.py \
   --manifest data/manifests/flow_real_test_aligned.jsonl \
-  --gpu-ids 1,2,3,4,6,7 \
+  --gpu-ids 1,2,3,4,5,6,7 \
   --backend official_chat \
   --query-mode official_format \
   --dtype float16 \
@@ -262,12 +263,26 @@ conda run --no-capture-output -n got python scripts/models/got_ocr2/run_inferenc
 ```bash
 conda run --no-capture-output -n got python scripts/models/got_ocr2/run_inference.py \
   --manifest data/manifests/flow_real_test_aligned.jsonl \
-  --adapter-dir outputs/got_ocr2_v2_swift/<run-id>/<checkpoint> \
-  --gpu-ids 1,2,3,4,6,7 \
+  --adapter-dir outputs/got_ocr2_v2_swift/v0-20260428-154351/checkpoint-256 \
+  --gpu-ids 1,2,3,4,5,6,7 \
   --backend official_chat \
   --query-mode official_format \
   --dtype float16 \
   --per-image-format raw
+
+# 在合成的验证集上推理
+conda run --no-capture-output -n got python scripts/models/got_ocr2/run_inference.py \
+  --manifest data/manifests/flow_v2/val.jsonl \
+  --adapter-dir outputs/got_ocr2_v2_swift/v0-20260428-154351/checkpoint-256 \
+  --gpu-ids 1,2,3,4,5,6,7 \
+  --limit 100 \
+  --backend official_chat \
+  --query-mode official_format \
+  --dtype float16 \
+  --output outputs/got_ocr2_v2_swift/v0-20260428-154351/eval/checkpoint-256/flow_v2_val_100_official_chat.jsonl \
+  --per-image-format raw
+
+
 ```
 
 历史 v1 checkpoint 示例：
@@ -329,18 +344,31 @@ conda run --no-capture-output -n got python scripts/models/got_ocr2/merge_infere
 
 ## 评测与模型对比
 
-严格 CSV 评测：
+表格格式评测：
+
+当前推理输出使用 raw GOT 或 pretty LaTeX 表格文本；默认评测会解析这些表格行，再与
+`target_csv` 的 source-of-truth 单元格比较。当预测可以解析成表格时，character accuracy
+也基于解析后的单元格文本，而不是原始 LaTeX markup。
 
 ```bash
-conda run --no-capture-output -n got python scripts/eval/evaluate_strict_csv.py \
+conda run --no-capture-output -n got python scripts/eval/evaluate_predictions.py \
   --predictions outputs/got_ocr2_base/eval/checkpoint-0/flow_real_all_official_chat.jsonl \
   --output outputs/reports/got_ocr2_base_eval.json
 ```
 
 ```bash
-conda run --no-capture-output -n got python scripts/eval/evaluate_strict_csv.py \
-  --predictions outputs/got_ocr2_v2_swift/<run-id>/eval/<checkpoint>/flow_real_all_official_chat.jsonl \
-  --output outputs/reports/got_ocr2_v2_<checkpoint>_eval.json
+conda run --no-capture-output -n got python scripts/eval/evaluate_predictions.py \
+  --predictions outputs/got_ocr2_v2_swift/v0-20260428-154351/eval/checkpoint-256/flow_real_all_official_chat.jsonl \
+  --output outputs/reports/got_ocr2_v2_256_eval.json
+```
+
+按结构/单元格正确性分类 per-image raw 输出，便于人工检查：
+
+```bash
+conda run --no-capture-output -n got python scripts/eval/classify_prediction_outputs.py \
+  --predictions outputs/got_ocr2_v2_swift/v0-20260428-154351/eval/checkpoint-256/flow_real_all_official_chat.jsonl \
+  --raw-dir outputs/got_ocr2_v2_swift/v0-20260428-154351/eval/checkpoint-256/per_image_raw \
+  --output-dir outputs/got_ocr2_v2_swift/v0-20260428-154351/eval/checkpoint-256/per_image_raw_by_eval
 ```
 
 Base vs fine-tuned 结构和单元格准确率对比：
@@ -348,10 +376,10 @@ Base vs fine-tuned 结构和单元格准确率对比：
 ```bash
 conda run --no-capture-output -n got python scripts/eval/compare_structure_cell_accuracy.py \
   --before-predictions outputs/got_ocr2_base/eval/checkpoint-0/flow_real_all_official_chat.jsonl \
-  --after-predictions outputs/got_ocr2_v2_swift/<run-id>/eval/<checkpoint>/flow_real_all_official_chat.jsonl \
+  --after-predictions outputs/got_ocr2_v2_swift/v0-20260428-154351/eval/checkpoint-256/flow_real_all_official_chat.jsonl \
   --before-label base \
-  --after-label <checkpoint> \
-  --output-dir outputs/model_comparisons/base_vs_v2_<checkpoint> \
+  --after-label checkpoint-256 \
+  --output-dir outputs/model_comparisons/base_vs_v2_checkpoint-256 \
   --no-plots
 ```
 

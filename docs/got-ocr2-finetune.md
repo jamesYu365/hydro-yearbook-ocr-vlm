@@ -293,16 +293,20 @@ This repository's wrapper around that process is:
 
 ## Evaluation
 
-This repository uses strict raw-output evaluation:
+This repository uses raw-output table evaluation:
 - no post-processing
 - no normalization
 - no structure repair
+- predictions may be raw GOT output or pretty-printed LaTeX tabular output
 
 Run evaluation after inference with:
 
 ```bash
-python3 ./scripts/eval/evaluate_strict_csv.py --predictions outputs/got_ocr2_v1_swift/<run-id>/eval/<checkpoint>/flow_real_all_official_chat.jsonl --output outputs/reports/got_ocr2_v1_swift_eval.json
+python3 ./scripts/eval/evaluate_predictions.py --predictions outputs/got_ocr2_v1_swift/<run-id>/eval/<checkpoint>/flow_real_all_official_chat.jsonl --output outputs/reports/got_ocr2_v1_swift_eval.json
 ```
+
+The evaluator parses raw GOT/LaTeX tabular predictions against the CSV source-of-truth target. When parsing succeeds,
+character accuracy is computed on parsed cell text instead of raw LaTeX markup.
 
 By default, inference writes adapter runs under the model run directory, for example
 `outputs/got_ocr2_v1_swift/<run-id>/eval/<checkpoint>/`. Base-model inference writes under

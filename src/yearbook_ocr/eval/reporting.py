@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from yearbook_ocr.common.jsonl import load_json, load_jsonl
-from yearbook_ocr.eval.csv_eval import score_sample
+from yearbook_ocr.eval.prediction_eval import score_sample
 
 
 def sample_metrics(predictions: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -128,13 +128,13 @@ def main() -> None:
     ckpt_score = ckpt_eval["summary"]["weighted_score"]
     if ckpt_score > base_score:
         lines.append(
-            f"- `{args.ckpt_label}` outperforms `{args.base_label}` on the strict real-flow test set by "
+            f"- `{args.ckpt_label}` outperforms `{args.base_label}` on the aligned real-flow test set by "
             f"`{ckpt_score - base_score:.4f}` weighted score."
         )
     elif ckpt_score < base_score:
         lines.append(
             f"- `{args.ckpt_label}` underperforms `{args.base_label}` by "
-            f"`{base_score - ckpt_score:.4f}` weighted score on the strict real-flow test set."
+            f"`{base_score - ckpt_score:.4f}` weighted score on the aligned real-flow test set."
         )
     else:
         lines.append(f"- `{args.ckpt_label}` and `{args.base_label}` tie on weighted score.")
@@ -160,7 +160,7 @@ def main() -> None:
                 clip_text(ckpt["prediction"]),
                 "```",
                 "",
-                "Target CSV:",
+                "Target label:",
                 "```text",
                 clip_text(base["target_csv"]),
                 "```",

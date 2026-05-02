@@ -14,6 +14,11 @@ from yearbook_ocr.eval.model_comparison import (
 )
 
 
+def latex_table(rows: list[list[str]]) -> str:
+    body = "\n".join(" & ".join(row) + r" \\" for row in rows)
+    return "\\begin{tabular}{|c|c|}\n" + body + "\n\\end{tabular}\n"
+
+
 def record(sample_id: str, prediction: str, target: str = "日期,一月\n1,12\n2,13\n") -> dict[str, str]:
     return {
         "sample_id": sample_id,
@@ -31,7 +36,7 @@ def write_jsonl(path: Path, rows: list[dict[str, str]]) -> None:
 
 
 def test_score_structure_cell_all_correct() -> None:
-    result = score_structure_cell(record("sample_1", "日期,一月\n1,12\n2,13\n"))
+    result = score_structure_cell(record("sample_1", latex_table([["日期", "一月"], ["1", "12"], ["2", "13"]])))
 
     assert result.structure_correct is True
     assert result.cell_accuracy == 1.0
@@ -68,7 +73,7 @@ def test_score_structure_cell_accepts_latex_prediction() -> None:
 
 
 def test_score_structure_cell_value_error_keeps_structure() -> None:
-    result = score_structure_cell(record("sample_1", "日期,一月\n1,12\n2,99\n"))
+    result = score_structure_cell(record("sample_1", latex_table([["日期", "一月"], ["1", "12"], ["2", "99"]])))
 
     assert result.structure_correct is True
     assert result.cell_accuracy == 5 / 6
@@ -76,7 +81,7 @@ def test_score_structure_cell_value_error_keeps_structure() -> None:
 
 
 def test_score_structure_cell_row_count_mismatch_zeroes_cells() -> None:
-    result = score_structure_cell(record("sample_1", "日期,一月\n1,12\n"))
+    result = score_structure_cell(record("sample_1", latex_table([["日期", "一月"], ["1", "12"]])))
 
     assert result.structure_correct is False
     assert result.cell_accuracy == 0.0
@@ -84,7 +89,7 @@ def test_score_structure_cell_row_count_mismatch_zeroes_cells() -> None:
 
 
 def test_score_structure_cell_column_count_mismatch_zeroes_cells() -> None:
-    result = score_structure_cell(record("sample_1", "日期,一月\n1\n2,13\n"))
+    result = score_structure_cell(record("sample_1", "\\begin{tabular}{|c|c|}\n日期 & 一月 \\\\\n1 \\\\\n2 & 13 \\\\\n\\end{tabular}\n"))
 
     assert result.structure_correct is False
     assert result.cell_accuracy == 0.0
@@ -92,7 +97,7 @@ def test_score_structure_cell_column_count_mismatch_zeroes_cells() -> None:
 
 
 def test_score_structure_cell_unparsable_prediction() -> None:
-    result = score_structure_cell(record("sample_1", '"unterminated'))
+    result = score_structure_cell(record("sample_1", "日\\月\n1\n2\n"))
 
     assert result.structure_correct is False
     assert result.cell_accuracy == 0.0
@@ -101,7 +106,13 @@ def test_score_structure_cell_unparsable_prediction() -> None:
 
 def test_index_records_rejects_duplicates() -> None:
     with pytest.raises(ValueError, match="duplicate sample_id"):
-        index_records([record("x", "a,b\n"), record("x", "a,b\n")], "before")
+        index_records(
+            [
+                record("x", latex_table([["日期", "一月"], ["1", "12"]])),
+                record("x", latex_table([["日期", "一月"], ["1", "12"]])),
+            ],
+            "before",
+        )
 
 
 def test_compare_predictions_writes_summary_and_transitions(tmp_path: Path) -> None:
@@ -110,20 +121,20 @@ def test_compare_predictions_writes_summary_and_transitions(tmp_path: Path) -> N
     output_dir = tmp_path / "comparison"
     write_jsonl(
         before_path,
-        [
-            record("improves", "日期,一月\n1\n2,13\n"),
-            record("regresses", "日期,一月\n1,12\n2,13\n"),
-            record("ties", "日期,一月\n1,12\n2,99\n"),
-        ],
-    )
+            [
+                record("improves", latex_table([["日期", "一月"], ["1"], ["2", "13"]])),
+                record("regresses", latex_table([["日期", "一月"], ["1", "12"], ["2", "13"]])),
+                record("ties", latex_table([["日期", "一月"], ["1", "12"], ["2", "99"]])),
+            ],
+        )
     write_jsonl(
         after_path,
-        [
-            record("improves", "日期,一月\n1,12\n2,13\n"),
-            record("regresses", "日期,一月\n1\n2,13\n"),
-            record("ties", "日期,一月\n1,12\n2,99\n"),
-        ],
-    )
+            [
+                record("improves", latex_table([["日期", "一月"], ["1", "12"], ["2", "13"]])),
+                record("regresses", latex_table([["日期", "一月"], ["1"], ["2", "13"]])),
+                record("ties", latex_table([["日期", "一月"], ["1", "12"], ["2", "99"]])),
+            ],
+        )
 
     payload = compare_predictions(before_path, after_path, "base", "ckpt", output_dir, write_images=False)
 

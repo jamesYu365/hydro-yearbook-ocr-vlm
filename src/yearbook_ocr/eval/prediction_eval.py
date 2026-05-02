@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,30 @@ def levenshtein_distance(left: str, right: str) -> int:
         return len(right)
     if not right:
         return len(left)
+    prefix_len = 0
+    max_prefix_len = min(len(left), len(right))
+    while prefix_len < max_prefix_len and left[prefix_len] == right[prefix_len]:
+        prefix_len += 1
+    if prefix_len:
+        left = left[prefix_len:]
+        right = right[prefix_len:]
+        if not left:
+            return len(right)
+        if not right:
+            return len(left)
+    suffix_len = 0
+    max_suffix_len = min(len(left), len(right))
+    while suffix_len < max_suffix_len and left[-suffix_len - 1] == right[-suffix_len - 1]:
+        suffix_len += 1
+    if suffix_len:
+        left = left[:-suffix_len]
+        right = right[:-suffix_len]
+        if not left:
+            return len(right)
+        if not right:
+            return len(left)
+    if len(right) > len(left):
+        left, right = right, left
     previous = list(range(len(right) + 1))
     for i, left_char in enumerate(left, start=1):
         current = [i]
@@ -32,11 +57,45 @@ def character_accuracy(prediction: str, target: str) -> float:
     return 1.0 - (levenshtein_distance(prediction, target) / denominator)
 
 
-def parse_csv_or_none(text: str) -> list[list[str]] | None:
+def parse_target_rows(text: str) -> list[list[str]]:
     try:
-        return list(csv.reader(text.splitlines()))
-    except csv.Error:
+        return list(csv.reader(text.splitlines(), strict=True))
+    except csv.Error as exc:
+        raise ValueError("Target table text is not parseable") from exc
+
+
+def parse_latex_tabular(text: str) -> list[list[str]] | None:
+    if "\\begin{tabular}" not in text:
         return None
+    rows: list[list[str]] = []
+    for raw_line in text.replace("\r\n", "\n").replace("\r", "\n").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("\\begin{tabular}") or line.startswith("\\end{tabular}"):
+            continue
+        line = line.replace("\\hline", "").strip()
+        if not line:
+            continue
+        line = re.sub(r"\\\\\s*$", "", line).strip()
+        if not line:
+            continue
+        rows.append([cell.strip() for cell in line.split("&")])
+    return rows
+
+
+def parse_prediction_rows(text: str) -> list[list[str]] | None:
+    return parse_latex_tabular(text)
+
+
+def same_shape(left: list[list[str]], right: list[list[str]]) -> bool:
+    return len(left) == len(right) and all(
+        len(left_row) == len(right_row) for left_row, right_row in zip(left, right)
+    )
+
+
+def table_rows_to_text(rows: list[list[str]]) -> str:
+    return "\n".join(",".join(row) for row in rows)
 
 
 def has_prefix_rows(pred_rows: list[list[str]], target_rows: list[list[str]]) -> bool:
@@ -63,13 +122,9 @@ def classify_error(
 ) -> str:
     if pred_rows is None:
         return "structure_error"
-    if prediction != target and target.startswith(prediction):
-        return "truncation"
     if has_prefix_rows(pred_rows, target_rows):
         return "truncation"
-    if len(pred_rows) != len(target_rows):
-        return "structure_error"
-    if any(len(p) != len(t) for p, t in zip(pred_rows, target_rows)):
+    if not same_shape(pred_rows, target_rows):
         return "structure_error"
     return "value_error"
 
@@ -112,12 +167,20 @@ def segment_scores(pred_rows: list[list[str]] | None, target_rows: list[list[str
     return scores
 
 
-def score_sample(sample_id: str, prediction: str, target: str) -> SampleResult:
-    pred_rows = parse_csv_or_none(prediction)
-    target_rows = parse_csv_or_none(target)
-    if target_rows is None:
-        raise ValueError(f"Target CSV is not parseable for {sample_id}")
-    char_acc = character_accuracy(prediction, target)
+def score_sample(
+    sample_id: str,
+    prediction: str,
+    target: str,
+) -> SampleResult:
+    pred_rows = parse_prediction_rows(prediction)
+    try:
+        target_rows = parse_target_rows(target)
+    except ValueError as exc:
+        raise ValueError(f"Target table text is not parseable for {sample_id}") from exc
+    if pred_rows is not None:
+        char_acc = character_accuracy(table_rows_to_text(pred_rows), table_rows_to_text(target_rows))
+    else:
+        char_acc = character_accuracy(prediction, target)
     per_cell = cell_accuracy(pred_rows, target_rows)
     weighted = 0.3 * char_acc + 0.7 * per_cell
     return SampleResult(
@@ -157,11 +220,13 @@ def evaluate(predictions_path: Path, output_path: Path | None = None) -> dict[st
             if not line.strip():
                 continue
             record = json.loads(line)
+            prediction = record["prediction"]
+            target = record["target_csv"]
             results.append(
                 score_sample(
                     sample_id=record["sample_id"],
-                    prediction=record["prediction"],
-                    target=record["target_csv"],
+                    prediction=prediction,
+                    target=target,
                 )
             )
     payload = {
@@ -185,7 +250,7 @@ def evaluate(predictions_path: Path, output_path: Path | None = None) -> dict[st
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Strict CSV evaluation with no output normalization.")
+    parser = argparse.ArgumentParser(description="Evaluate raw GOT/LaTeX OCR table predictions.")
     parser.add_argument("--predictions", type=Path, required=True)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -195,4 +260,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

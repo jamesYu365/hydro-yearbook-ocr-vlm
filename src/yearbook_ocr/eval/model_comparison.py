@@ -4,14 +4,19 @@ import argparse
 import csv
 import json
 import os
-import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from yearbook_ocr.common.jsonl import load_jsonl
-from yearbook_ocr.eval.csv_eval import classify_error
+from yearbook_ocr.eval.prediction_eval import (
+    classify_error,
+    parse_latex_tabular,
+    parse_prediction_rows,
+    parse_target_rows,
+    same_shape,
+)
 
 
 @dataclass
@@ -25,44 +30,6 @@ class StructureCellMetrics:
     error_type: str
 
 
-def parse_csv_strict(text: str) -> list[list[str]] | None:
-    try:
-        return list(csv.reader(text.splitlines(), strict=True))
-    except csv.Error:
-        return None
-
-
-def parse_latex_tabular(text: str) -> list[list[str]] | None:
-    if "\\begin{tabular}" not in text:
-        return None
-    rows: list[list[str]] = []
-    for raw_line in text.replace("\r\n", "\n").replace("\r", "\n").splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        if line.startswith("\\begin{tabular}") or line.startswith("\\end{tabular}"):
-            continue
-        line = line.replace("\\hline", "").strip()
-        if not line:
-            continue
-        line = re.sub(r"\\\\\s*$", "", line).strip()
-        if not line:
-            continue
-        rows.append([cell.strip() for cell in line.split("&")])
-    return rows
-
-
-def parse_table_rows(text: str) -> list[list[str]] | None:
-    latex_rows = parse_latex_tabular(text)
-    if latex_rows is not None:
-        return latex_rows
-    return parse_csv_strict(text)
-
-
-def same_shape(left: list[list[str]], right: list[list[str]]) -> bool:
-    return len(left) == len(right) and all(len(left_row) == len(right_row) for left_row, right_row in zip(left, right))
-
-
 def count_target_cells(rows: list[list[str]]) -> int:
     return sum(len(row) for row in rows)
 
@@ -71,10 +38,11 @@ def score_structure_cell(record: dict[str, Any]) -> StructureCellMetrics:
     sample_id = record["sample_id"]
     prediction = record["prediction"]
     target = record["target_csv"]
-    pred_rows = parse_table_rows(prediction)
-    target_rows = parse_table_rows(target)
-    if target_rows is None:
-        raise ValueError(f"Target CSV is not parseable for {sample_id}")
+    pred_rows = parse_prediction_rows(prediction)
+    try:
+        target_rows = parse_target_rows(target)
+    except ValueError as exc:
+        raise ValueError(f"Target table text is not parseable for {sample_id}") from exc
 
     total_cells = count_target_cells(target_rows)
     structure_correct = pred_rows is not None and same_shape(pred_rows, target_rows)

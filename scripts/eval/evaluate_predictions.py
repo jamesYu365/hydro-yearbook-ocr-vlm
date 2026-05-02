@@ -7,7 +7,7 @@ from pathlib import Path
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
-from yearbook_ocr.eval.csv_eval import *  # noqa: F401,F403
+from yearbook_ocr.eval.prediction_eval import *  # noqa: F401,F403
 
 
 if __name__ == "__main__":

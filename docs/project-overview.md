@@ -21,7 +21,7 @@ The repository is no longer documentation-only. The current implemented pieces a
 - synthetic flow-table generation under `scripts/data/`
 - `ms-swift` manifest conversion for `GOT-OCR2.0` under `scripts/models/got_ocr2/`
 - unified GOT inference through `scripts/models/got_ocr2/run_inference.py`
-- CSV-oriented evaluation through `scripts/eval/`
+- raw GOT/LaTeX prediction evaluation through `scripts/eval/`
 - a Linux environment setup script under `scripts/`
 - basic tests under `tests/`
 - a validated `swift sft` wrapper under `scripts/models/got_ocr2/`
@@ -81,10 +81,10 @@ The main remaining execution gaps are:
 - train the v1 LoRA model from the current synthetic Swift manifests
 - rerun base and fine-tuned inference on the real extracted flow tables
 - run a formal base-vs-v1-fine-tuned comparison on the real extracted flow tables
-- decide whether to keep the official GOT-format target as the primary benchmark target or reintroduce a first-class CSV benchmark
+- continue improving the raw GOT/LaTeX prediction benchmark on the aligned real flow tables
 
 The main remaining real-data gap outside the current flow benchmark is:
-- `2014 水位` still lacks calibrated CSV labels in the repository, so no alignment manifest or strict evaluation has been built for it yet
+- `2014 水位` still lacks calibrated CSV labels in the repository, so no alignment manifest or raw-output benchmark has been built for it yet
 
 ## Current Recommended Training Route
 

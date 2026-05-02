@@ -7,7 +7,7 @@ Prepare a Linux `got` conda environment that can run:
 - GOT-OCR2.0 data conversion
 - `ms-swift` LoRA fine-tuning
 - GOT inference and report generation
-- strict CSV evaluation when needed
+- table-format evaluation for raw GOT/LaTeX predictions
 
 Prepare a separate Linux `rapid` conda environment that can run:
 - real PDF page rendering
@@ -131,7 +131,7 @@ pytest -q
 
 Current verified result on this project:
 - focused data, manifest, inference, and evaluation suites pass in the `got` environment
-- current key command: `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_strict_csv.py tests/test_generate_synthetic_flow_v0.py tests/test_got_inference.py tests/test_model_comparison.py`
+- current key command: `conda run -n got pytest -q tests/test_flow_common.py tests/test_backfill_got_format_targets.py tests/test_real_flow_test_prep.py tests/test_evaluate_predictions.py tests/test_output_classification.py tests/test_generate_synthetic_flow_v0.py tests/test_got_inference.py tests/test_model_comparison.py`
 
 ## Chinese Fonts
 

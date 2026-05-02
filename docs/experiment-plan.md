@@ -38,13 +38,13 @@ Run a single-model baseline with `GOT-OCR2.0` on synthetic flow tables and evalu
 ## Metrics
 
 - primary metrics should match the active target format
-- strict CSV metrics remain available when predictions are also CSV
-- if the benchmark target stays on official GOT format, the report must make that explicit instead of silently reusing CSV metrics
+- current GOT runs produce raw or pretty LaTeX table text, so evaluation should use the shared table parser
+- character accuracy is computed on parsed table cell text when parsing succeeds, not on raw LaTeX markup
 
 ## Current Execution Order
 
 1. extract real station-level table images from the PDF
 2. train `GOT-OCR2.0` LoRA from the v1 synthetic Swift manifests
 3. rerun base and fine-tuned inference on the real extracted test set
-4. run model comparison and strict CSV-compatible evaluation where the prediction target supports it
+4. run table-format evaluation and model comparison on raw/pretty GOT outputs
 5. inspect representative failure cases and tag them
